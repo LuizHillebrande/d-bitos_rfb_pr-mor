@@ -95,10 +95,12 @@ def login():
     )
 
     # Agora que o "Em Execução" não está mais visível, podemos clicar no botão de download
-    baixar_definitivamente = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((By.XPATH, "//div[@class='media mr-1']//div[@class='col-2']//svg[contains(@class, 'feather-download')]"))
-    )
-    baixar_definitivamente.click()
+    #baixar_definitivamente = WebDriverWait(driver, 10).until(
+        #EC.element_to_be_clickable((By.XPATH, "//div[@class='media mr-1']//div[@class='col-2']//svg[contains(@class, 'feather-download')]"))
+    #)
+    #baixar_definitivamente.click()
+
+    pyautogui.click(667,300, duration = 1)
 
 
 
