@@ -15,9 +15,12 @@ import pandas as pd
 import customtkinter as ctk
 import json
 from time import sleep
+import zipfile
+import os
+import shutil
 
 def login():
-    download_folder = os.getcwd()  # Defina o caminho completo da pasta debitos_rfb
+    download_folder = os.path.join(os.getcwd(), 'debitos')
 
     # Configuração para o Chrome salvar os PDFs diretamente na pasta especificada
     options = webdriver.ChromeOptions()
@@ -101,6 +104,29 @@ def login():
     #baixar_definitivamente.click()
 
     pyautogui.click(667,300, duration = 1)
+    sleep(5)
+
+    zip_file = None
+    for file in os.listdir(download_folder):
+        if file.endswith('.zip'):
+            zip_file_path = os.path.join(download_folder, file)
+            if not zip_file or os.path.getmtime(zip_file_path) > os.path.getmtime(zip_file):
+                zip_file = zip_file_path
+
+    if zip_file:
+        # Descompactar o arquivo ZIP
+        try:
+            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                zip_ref.extractall(download_folder)
+            print(f"Arquivo ZIP {zip_file} descompactado.")
+
+            # Excluir o arquivo ZIP
+            os.remove(zip_file)
+            print(f"Arquivo ZIP {zip_file} excluído.")
+        except Exception as e:
+            print(f"Erro ao descompactar ou excluir o arquivo ZIP: {e}")
+    else:
+        print("Nenhum arquivo ZIP encontrado na pasta 'debitos'.")
 
 
 
