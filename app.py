@@ -106,6 +106,7 @@ def login():
     pyautogui.click(667,300, duration = 1)
     sleep(5)
 
+
     zip_file = None
     for file in os.listdir(download_folder):
         if file.endswith('.zip'):
@@ -129,10 +130,42 @@ def login():
         print("Nenhum arquivo ZIP encontrado na pasta 'debitos'.")
 
 
+    sleep(3)
+    pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+    nomes_empresas = extrair_nome_empresa(pasta_debitos)
+    salvar_nome_empresa_excel(nomes_empresas, 'nomes_empresas.xlsx')
 
-
-    sleep(5)
+        
+    sleep(2)
     driver.quit()
+
+def extrair_nome_empresa(pasta_debitos):
+    # Lista para armazenar os nomes das empresas
+    nomes_empresas = []
+
+    # Percorrer todos os arquivos na pasta
+    for arquivo in os.listdir(pasta_debitos):
+        if arquivo.endswith(".pdf"):  # Verifica se é um arquivo PDF
+            # Nome do arquivo: situacao_fiscal--CNPJ-NOME DA EMPRESA.pdf
+            # Padrão de regex para extrair o nome da empresa
+            match = re.match(r'situacao_fiscal--\d{14}-(.*)\.pdf', arquivo)
+            if match:
+                # Extrai o nome da empresa
+                nome_empresa = match.group(1)
+                nomes_empresas.append(nome_empresa)
+
+    return nomes_empresas
+
+# Função para salvar os nomes em um arquivo Excel
+def salvar_nome_empresa_excel(nomes_empresas, caminho_arquivo_excel):
+    # Criar um DataFrame com os nomes
+    df = pd.DataFrame(nomes_empresas, columns=["Nome da Empresa"])
+    # Salvar no Excel
+    df.to_excel(caminho_arquivo_excel, index=False)
+
+# Caminho da pasta onde os PDFs foram descompactados
+pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+
 
 login()
 
