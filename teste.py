@@ -67,7 +67,7 @@ def processar_excel_e_abrir_pdf():
             
             # Agora consultar o PDF correspondente
             consultar_pdf_da_empresa(nome_empresa)
-            
+
 def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     # Salvar a lista de números em um arquivo Excel
     df = pd.DataFrame(lista_numeros, columns=["Inscrição da Dívida"])
@@ -196,54 +196,59 @@ def login():
     pyautogui.press('Esc')
     sleep(2)
 
-    lupa = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]"))
+    lupas = WebDriverWait(driver,5).until(
+        EC.presence_of_all_elements_located((By.XPATH,"//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]"))
     )
-
-    lupa.click()
-
-    #tentando clicar em dívidas ativas
-    try: 
-        divida_ativa = WebDriverWait(driver,5).until(
-            EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
-        )
-        divida_ativa.click()
-
-        # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
-        numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
-        lista_numeros = [numero.text for numero in numeros]
-
-        empresa_element = driver.find_element(By.XPATH, "//h5[@id='pendencia-fiscal___BV_modal_title_']")
-        nome_empresa_completo = empresa_element.text
-        # Remover a parte "Pendência da situação fiscal - " do nome
-        nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
-        nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
-
-        pasta_destino = "dividas ativas"
-        if not os.path.exists(pasta_destino):
-            os.makedirs(pasta_destino)
-
-        salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
-        sleep(1)
-        processar_excel_e_abrir_pdf()
-        #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
-        #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
-        #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
-        #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
-
-    except Exception as e:
-        print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
     
-    #tentando clicar em débitos(sief)
-    try:    
-        debitos_sief = WebDriverWait(driver,5).until(
-            EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
-        )
-        debitos_sief.click()
-        print('CLICADO EM DEBITOS SIEF')
-    except Exception as i:
-        print('n cliquei em debitos sie F')
-        print(f'Erro{i}')
+    for lupa in lupas:
+        WebDriverWait(driver, 5).until(EC.element_to_be_clickable(lupa)).click()
+
+
+        #tentando clicar em dívidas ativas
+        try: 
+            divida_ativa = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
+            )
+            divida_ativa.click()
+
+            # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
+            numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+            lista_numeros = [numero.text for numero in numeros]
+
+            empresa_element = driver.find_element(By.XPATH, "//h5[@id='pendencia-fiscal___BV_modal_title_']")
+            nome_empresa_completo = empresa_element.text
+            # Remover a parte "Pendência da situação fiscal - " do nome
+            nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
+            nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
+
+            pasta_destino = "dividas ativas"
+            if not os.path.exists(pasta_destino):
+                os.makedirs(pasta_destino)
+
+            salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
+            sleep(1)
+            processar_excel_e_abrir_pdf()
+            #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
+            #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
+            #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
+            #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
+
+        except Exception as e:
+            print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
+        
+        #tentando clicar em débitos(sief)
+        try:    
+            debitos_sief = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
+            )
+            debitos_sief.click()
+            print('CLICADO EM DEBITOS SIEF')
+        except Exception as i:
+            print('n cliquei em debitos sie F')
+            print(f'Erro{i}')
+
+        pyautogui.press('esc')
+        sleep(2)
 
 
     sleep(3)
