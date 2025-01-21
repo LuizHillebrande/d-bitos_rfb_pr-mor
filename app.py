@@ -167,20 +167,26 @@ def salvar_nome_empresa_excel(nomes_empresas, caminho_arquivo_excel):
 pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
 
+
+import pdfplumber
+import pandas as pd
+import re
+import os
+
+# Função para carregar a tabela de códigos fiscais
 def carregar_codigos_fiscais(caminho_arquivo_excel):
-    # Carregar os dados dos dois sheets
     df_depto = pd.read_excel(caminho_arquivo_excel, sheet_name="Depto Pessoal")
     df_fiscal = pd.read_excel(caminho_arquivo_excel, sheet_name="Fiscal")
 
     # Concatenar os dois dataframes
     df = pd.concat([df_depto, df_fiscal])
 
-    # Converter para um dicionário {codigo: descricao}
-    codigos_fiscais = dict(zip(df.iloc[:, 0], df.iloc[:, 1]))
+    # Criar um dicionário {codigo: descricao}
+    codigos_fiscais = dict(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1]))
     
     return codigos_fiscais
 
-# Função para extrair o texto de todos os PDFs na pasta
+# Função para extrair texto dos PDFs
 def extrair_texto_pdfs(pasta_debitos):
     textos_pdfs = {}
     
@@ -190,38 +196,70 @@ def extrair_texto_pdfs(pasta_debitos):
             with pdfplumber.open(caminho_pdf) as pdf:
                 texto_completo = ""
                 for pagina in pdf.pages:
-                    texto_completo += pagina.extract_text()
+                    texto_completo += pagina.extract_text() + "\n"
                 textos_pdfs[arquivo] = texto_completo
     
     return textos_pdfs
 
-# Função para buscar os códigos fiscais nos textos extraídos dos PDFs
+# Função para buscar os códigos fiscais e capturar o "Sdo. Dev. Cons."
 def buscar_codigos_fiscais(textos_pdfs, codigos_fiscais):
     resultados = []
 
     # Loop por cada PDF e seu texto
     for nome_pdf, texto in textos_pdfs.items():
-        # Procurar pelos códigos fiscais no texto do PDF
+        nome_empresa = nome_pdf.split('--')[1].split('-')[1]  # Extrair nome da empresa
+
+        # Buscar os débitos normais (Receita Federal)
         for codigo, descricao in codigos_fiscais.items():
-            codigo_str = str(codigo)
-            # Regex para encontrar o código e seu valor associado
-            pattern = r"(" + re.escape(codigo_str) + r")(.*?)(\d+[\.,]?\d{2})"
+            pattern = rf"{re.escape(codigo)}\s+-\s+(.*?)\s+([\d\/-]+)\s+([\d\/-]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([A-Z]+)"
             matches = re.findall(pattern, texto)
 
             for match in matches:
-                codigo_fiscal = match[0]
+                codigo_fiscal = codigo
                 descricao_encontrada = descricao
-                valor_total = match[2].replace(",", ".")
-                
-                # Salvar os resultados com a empresa e o valor
+                pa_exercicio = match[1]  # PA/Exercício
+                data_vcto = match[2]  # Data Vcto.
+                vl_original = match[3]  # Valor original
+                sdo_devedor = match[4]  # Saldo Devedor
+                multa = match[5]  # Multa
+                juros = match[6]  # Juros
+                sdo_dev_cons = match[7].replace(",", ".")  # **Sdo. Dev. Cons. (VALOR TOTAL)**
+                status = match[8]  # Situação
+
+                # Salvar os resultados
                 resultado = {
-                    "Nome da Empresa": nome_pdf.split('--')[1].split('-')[1],  # Extrair nome da empresa do nome do arquivo
+                    "Origem": "Receita Federal",
+                    "Nome da Empresa": nome_empresa,
                     "Código Fiscal": codigo_fiscal,
                     "Descrição": descricao_encontrada,
-                    "Valor Total": valor_total
+                    "PA/Exercício": pa_exercicio,
+                    "Data Vcto": data_vcto,
+                    "Valor Original": vl_original,
+                    "Saldo Devedor": sdo_devedor,
+                    "Multa": multa,
+                    "Juros": juros,
+                    "Sdo. Dev. Cons.": sdo_dev_cons,  # ✅ VALOR FINAL
+                    "Situação": status
                 }
                 resultados.append(resultado)
-    
+
+        # Buscar os débitos na Procuradoria-Geral da Fazenda Nacional
+        regex_procuradoria = r"(\d{2}\.\d{1}\.\d{2}\.\d{6}-\d{2})\s+(\d{4}-[A-Z ]+)\s+([\d\/-]+)\s+([\d\/-]+)\s+([\d\.,]+)\s+([\w ]+)"
+        matches_procuradoria = re.findall(regex_procuradoria, texto)
+
+        for match in matches_procuradoria:
+            resultado = {
+                "Origem": "Procuradoria-Geral",
+                "Nome da Empresa": nome_empresa,
+                "Inscrição": match[0],
+                "Código Fiscal": match[1],
+                "Data Inscrição": match[2],
+                "Ajuizado em": match[3],
+                "Valor": match[4].replace(",", "."),
+                "Situação": match[5]
+            }
+            resultados.append(resultado)
+
     return resultados
 
 # Função para salvar os resultados em um arquivo Excel
@@ -229,25 +267,17 @@ def salvar_resultados_excel(resultados, caminho_arquivo_excel):
     df_resultados = pd.DataFrame(resultados)
     df_resultados.to_excel(caminho_arquivo_excel, index=False)
 
-# Caminho do arquivo Excel com os códigos fiscais
+# Caminhos
 caminho_tabela_codigos = 'TABELASCDIGOSDERECEITA.xlsx'
-
-# Caminho da pasta 'debitos' onde estão os PDFs
 pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
-# Carregar os códigos fiscais
+# Executando as funções
 codigos_fiscais = carregar_codigos_fiscais(caminho_tabela_codigos)
-
-# Extrair o texto de todos os PDFs
 textos_pdfs = extrair_texto_pdfs(pasta_debitos)
-
-# Buscar os códigos fiscais nos textos
 resultados = buscar_codigos_fiscais(textos_pdfs, codigos_fiscais)
-
-# Salvar os resultados no Excel
 salvar_resultados_excel(resultados, 'resultados_fiscais.xlsx')
 
-print("Resultados fiscais extraídos e salvos com sucesso!")
+print("✅ Resultados extraídos e salvos com sucesso!")
 
 
 
