@@ -167,12 +167,6 @@ def salvar_nome_empresa_excel(nomes_empresas, caminho_arquivo_excel):
 pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
 
-
-import pdfplumber
-import pandas as pd
-import re
-import os
-
 # Função para carregar a tabela de códigos fiscais
 def carregar_codigos_fiscais(caminho_arquivo_excel):
     df_depto = pd.read_excel(caminho_arquivo_excel, sheet_name="Depto Pessoal")
