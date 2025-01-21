@@ -103,10 +103,66 @@ def login():
     #)
     #baixar_definitivamente.click()
 
+
     pyautogui.click(667,300, duration = 1)
+
     sleep(5)
+    pyautogui.press('Esc')
+    sleep(2)
+
+    lupa = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]"))
+    )
+
+    lupa.click()
+
+    #tentando clicar em dívidas ativas
+    try: 
+        divida_ativa = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
+        )
+        divida_ativa.click()
+
+        # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
+        numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+        lista_numeros = [numero.text for numero in numeros]
+
+        empresa_element = driver.find_element(By.XPATH, "//h5[@id='pendencia-fiscal___BV_modal_title_']")
+
+        nome_empresa_completo = empresa_element.text
+        # Remover a parte "Pendência da situação fiscal - " do nome
+        nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
+        nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
+
+        pasta_destino = "dividas ativas"
+        if not os.path.exists(pasta_destino):
+            os.makedirs(pasta_destino)
+        df = pd.DataFrame(lista_numeros, columns=["Inscrição da dívida."])
+        caminho_arquivo = os.path.join(pasta_destino, f"{nome_arquivo}.xlsx")
+        # Salvar o DataFrame em um arquivo Excel
+        df.to_excel(caminho_arquivo, index=False)
 
 
+        #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
+        #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
+        #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
+        #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
+
+    except Exception as e:
+        print(f'Erro{e}')
+    
+    #tentando clicar em débitos(sief)
+    try:    
+        debitos_sief = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
+        )
+        debitos_sief.click()
+        print('CLICADO EM DEBITOS SIEF')
+    except Exception as i:
+        print('n cliquei em debitos sie F')
+        print(f'Erro{i}')
+
+    #descompactando o arquivo zip
     zip_file = None
     for file in os.listdir(download_folder):
         if file.endswith('.zip'):
@@ -132,29 +188,13 @@ def login():
 
     sleep(3)
     pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-    nomes_empresas = extrair_nome_empresa(pasta_debitos)
-    salvar_nome_empresa_excel(nomes_empresas, 'nomes_empresas.xlsx')
 
         
     sleep(2)
     driver.quit()
 
-def extrair_nome_empresa(pasta_debitos):
-    # Lista para armazenar os nomes das empresas
-    nomes_empresas = []
+login()
 
-    # Percorrer todos os arquivos na pasta
-    for arquivo in os.listdir(pasta_debitos):
-        if arquivo.endswith(".pdf"):  # Verifica se é um arquivo PDF
-            # Nome do arquivo: situacao_fiscal--CNPJ-NOME DA EMPRESA.pdf
-            # Padrão de regex para extrair o nome da empresa
-            match = re.match(r'situacao_fiscal--\d{14}-(.*)\.pdf', arquivo)
-            if match:
-                # Extrai o nome da empresa
-                nome_empresa = match.group(1)
-                nomes_empresas.append(nome_empresa)
-
-    return nomes_empresas
 
 # Função para salvar os nomes em um arquivo Excel
 def salvar_nome_empresa_excel(nomes_empresas, caminho_arquivo_excel):
@@ -165,13 +205,6 @@ def salvar_nome_empresa_excel(nomes_empresas, caminho_arquivo_excel):
 
 # Caminho da pasta onde os PDFs foram descompactados
 pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-
-
-
-import pdfplumber
-import pandas as pd
-import re
-import os
 
 # Função para carregar a tabela de códigos fiscais
 def carregar_codigos_fiscais(caminho_arquivo_excel):
@@ -186,98 +219,6 @@ def carregar_codigos_fiscais(caminho_arquivo_excel):
     
     return codigos_fiscais
 
-# Função para extrair texto dos PDFs
-def extrair_texto_pdfs(pasta_debitos):
-    textos_pdfs = {}
-    
-    for arquivo in os.listdir(pasta_debitos):
-        if arquivo.endswith(".pdf"):
-            caminho_pdf = os.path.join(pasta_debitos, arquivo)
-            with pdfplumber.open(caminho_pdf) as pdf:
-                texto_completo = ""
-                for pagina in pdf.pages:
-                    texto_completo += pagina.extract_text() + "\n"
-                textos_pdfs[arquivo] = texto_completo
-    
-    return textos_pdfs
-
-# Função para buscar os códigos fiscais e capturar o "Sdo. Dev. Cons."
-def buscar_codigos_fiscais(textos_pdfs, codigos_fiscais):
-    resultados = []
-
-    # Loop por cada PDF e seu texto
-    for nome_pdf, texto in textos_pdfs.items():
-        nome_empresa = nome_pdf.split('--')[1].split('-')[1]  # Extrair nome da empresa
-
-        # Buscar os débitos normais (Receita Federal)
-        for codigo, descricao in codigos_fiscais.items():
-            pattern = rf"{re.escape(codigo)}\s+-\s+(.*?)\s+([\d\/-]+)\s+([\d\/-]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([\d\.,]+)\s+([A-Z]+)"
-            matches = re.findall(pattern, texto)
-
-            for match in matches:
-                codigo_fiscal = codigo
-                descricao_encontrada = descricao
-                pa_exercicio = match[1]  # PA/Exercício
-                data_vcto = match[2]  # Data Vcto.
-                vl_original = match[3]  # Valor original
-                sdo_devedor = match[4]  # Saldo Devedor
-                multa = match[5]  # Multa
-                juros = match[6]  # Juros
-                sdo_dev_cons = match[7].replace(",", ".")  # **Sdo. Dev. Cons. (VALOR TOTAL)**
-                status = match[8]  # Situação
-
-                # Salvar os resultados
-                resultado = {
-                    "Origem": "Receita Federal",
-                    "Nome da Empresa": nome_empresa,
-                    "Código Fiscal": codigo_fiscal,
-                    "Descrição": descricao_encontrada,
-                    "PA/Exercício": pa_exercicio,
-                    "Data Vcto": data_vcto,
-                    "Valor Original": vl_original,
-                    "Saldo Devedor": sdo_devedor,
-                    "Multa": multa,
-                    "Juros": juros,
-                    "Sdo. Dev. Cons.": sdo_dev_cons,  # ✅ VALOR FINAL
-                    "Situação": status
-                }
-                resultados.append(resultado)
-
-        # Buscar os débitos na Procuradoria-Geral da Fazenda Nacional
-        regex_procuradoria = r"(\d{2}\.\d{1}\.\d{2}\.\d{6}-\d{2})\s+(\d{4}-[A-Z ]+)\s+([\d\/-]+)\s+([\d\/-]+)\s+([\d\.,]+)\s+([\w ]+)"
-        matches_procuradoria = re.findall(regex_procuradoria, texto)
-
-        for match in matches_procuradoria:
-            resultado = {
-                "Origem": "Procuradoria-Geral",
-                "Nome da Empresa": nome_empresa,
-                "Inscrição": match[0],
-                "Código Fiscal": match[1],
-                "Data Inscrição": match[2],
-                "Ajuizado em": match[3],
-                "Valor": match[4].replace(",", "."),
-                "Situação": match[5]
-            }
-            resultados.append(resultado)
-
-    return resultados
-
-# Função para salvar os resultados em um arquivo Excel
-def salvar_resultados_excel(resultados, caminho_arquivo_excel):
-    df_resultados = pd.DataFrame(resultados)
-    df_resultados.to_excel(caminho_arquivo_excel, index=False)
-
-# Caminhos
-caminho_tabela_codigos = 'TABELASCDIGOSDERECEITA.xlsx'
-pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-
-#Executando as funções
-codigos_fiscais = carregar_codigos_fiscais(caminho_tabela_codigos)
-textos_pdfs = extrair_texto_pdfs(pasta_debitos)
-resultados = buscar_codigos_fiscais(textos_pdfs, codigos_fiscais)
-salvar_resultados_excel(resultados, 'resultados_fiscais.xlsx')
-
-print("✅ Resultados extraídos e salvos com sucesso!")
 
 
 
