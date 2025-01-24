@@ -68,7 +68,7 @@ def consultar_pdf_da_empresa(nome_empresa):
     else:
         print(f"⚠️ Nenhum PDF encontrado para a empresa '{nome_empresa}'.")
 
-
+#busca os numeros de dividas ativas aqui
 def abrir_pdf(caminho_pdf):
     try:
         # Usando pdfplumber para abrir e extrair informações do PDF
@@ -81,6 +81,7 @@ def abrir_pdf(caminho_pdf):
                 print("=" * 50)  # Separador para facilitar a leitura do conteúdo
     except Exception as e:
         print(f"Erro ao abrir o arquivo PDF {caminho_pdf}: {e}")
+    
 
 def processar_excel_e_abrir_pdf():
     # Caminho do diretório onde os arquivos Excel estão armazenados
@@ -201,8 +202,9 @@ def login():
     )
     baixar_popup.click()
 
-    sleep(8)
+    sleep(6)
     pyautogui.press('F5')
+    sleep(2)
 
     baixar_nuvem = WebDriverWait(driver, 5).until(
         EC.element_to_be_clickable((By.XPATH, "//a[@class='nav-link dropdown-toggle' and @id='__BVID__197__BV_toggle_']"))
