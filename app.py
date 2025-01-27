@@ -492,8 +492,119 @@ def login():
     sleep(2)
     driver.quit()
 
+from PIL import Image, ImageTk
 
 
+def atualizar_informacoes(frame):
+    """
+    Simula a atualização de informações dinâmicas no frame central.
+    """
+    for widget in frame.winfo_children():
+        widget.destroy()  # Limpa o conteúdo anterior
 
+    info_label = ctk.CTkLabel(
+        frame,
+        text="Atualizando informações... 🚀",
+        font=("Arial", 16),
+        anchor="center",
+    )
+    info_label.pack(pady=10)
 
-login()
+    # Exemplo de atualização futura
+    info_atualizada = ctk.CTkLabel(
+        frame,
+        text="Extração de débitos em andamento...",
+        font=("Arial", 14),
+        anchor="center",
+    )
+    info_atualizada.pack(pady=5)
+
+# Configuração inicial da interface
+ctk.set_appearance_mode("dark")  # "System", "Light" ou "Dark"
+ctk.set_default_color_theme("blue")  # "blue", "green" ou "dark-blue"
+
+# Janela principal
+app = ctk.CTk()
+app.geometry("900x600")
+app.title("Sistema de Extração de Débitos - Primor")
+
+# Menu lateral
+menu_frame = ctk.CTkFrame(app, width=200, corner_radius=0)
+menu_frame.pack(side="left", fill="y")
+
+menu_label = ctk.CTkLabel(
+    menu_frame,
+    text="Menu",
+    font=("Arial", 20, "bold"),
+    anchor="w",
+)
+menu_label.pack(pady=(20, 10), padx=10, anchor="w")
+
+# Botão no menu
+extrair_button = ctk.CTkButton(
+    menu_frame,
+    text="Extrair débitos",
+    command=login,
+    font=("Arial", 16, "bold"),
+)
+extrair_button.pack(pady=20, padx=10)
+
+# Área principal
+main_frame = ctk.CTkFrame(app, corner_radius=10)
+main_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+main_label = ctk.CTkLabel(
+    main_frame,
+    text="Bem-vindo ao PrimorFiscal Messenger",
+    font=("Arial", 24, "bold"),
+    anchor="center",
+)
+main_label.pack(pady=20)
+
+# Adicionar imagens e mensagem de parceria
+try:
+    primor_image = ImageTk.PhotoImage(Image.open("imgs/primor.png").resize((200, 120)))
+    luiz_image = ImageTk.PhotoImage(Image.open("imgs/luiz.png").resize((200, 120)))
+
+    images_frame = ctk.CTkFrame(main_frame)
+    images_frame.pack(pady=20)
+
+    primor_label = ctk.CTkLabel(images_frame, image=primor_image, text="")
+    primor_label.grid(row=0, column=0, padx=10)
+
+    luiz_label = ctk.CTkLabel(images_frame, image=luiz_image, text="")
+    luiz_label.grid(row=0, column=1, padx=10)
+
+    # Texto de parceria
+    partnership_label = ctk.CTkLabel(
+        main_frame,
+        text="Uma parceria entre Primor e Luiz Fernando Hillebrande",
+        font=("Arial", 16, "italic"),
+        anchor="center",
+    )
+    partnership_label.pack(pady=(10, 20))
+
+except Exception as e:
+    print(f"Erro ao carregar imagens: {e}")
+
+# Frame dinâmico para atualizações
+info_frame = ctk.CTkFrame(main_frame, height=200)
+info_frame.pack(fill="both", expand=True, padx=10, pady=(10, 20))
+
+# Atualizar as informações no frame (exemplo)
+atualizar_informacoes(info_frame)
+
+# Footer (centralizado)
+footer_frame = ctk.CTkFrame(app, height=50, corner_radius=0)
+footer_frame.pack(side="bottom", fill="x")
+
+footer_label = ctk.CTkLabel(
+    footer_frame,
+    text="Luiz Fernando Hillebrande",
+    font=("Arial", 14),
+    anchor="center",
+)
+footer_label.pack(pady=10)
+
+# Iniciar a interface
+app.mainloop()
