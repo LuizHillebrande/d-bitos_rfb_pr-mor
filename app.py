@@ -64,38 +64,63 @@ def consultar_pdf_da_empresa(nome_empresa, numeros_procurados):
         print(f"🔍 PDF encontrado: {nome_pdf_proximo} (Similaridade: {score}%)")
 
         # Aqui você pode usar uma biblioteca para abrir o PDF, por exemplo, pdfplumber
-        abrir_pdf(caminho_pdf, numeros_procurados)
+        abrir_pdf(caminho_pdf, numeros_procurados, nome_empresa)
     else:
         print(f"⚠️ Nenhum PDF encontrado para a empresa '{nome_empresa}'.")
 
 #busca os numeros de dividas ativas aqui
-def abrir_pdf(caminho_pdf, numeros_procurados):
+
+
+def abrir_pdf(caminho_pdf, numeros_procurados, nome_empresa, pasta_destino="resultados"):
     """
-    Abre o PDF, procura por números específicos no texto do PDF e captura todas as situações listadas após 'Situação:'.
+    Abre o PDF, procura por números específicos, combina texto de todas as páginas 
+    e captura a situação associada ao número.
     """
+    resultados = []  # Lista para armazenar os dados processados
+
     try:
         with pdfplumber.open(caminho_pdf) as pdf:
-            for page_num, page in enumerate(pdf.pages):
-                text = page.extract_text()
-                if not text:
-                    continue
-                
-                print(f"Analisando página {page_num + 1} do PDF...")
+            # Combinar o texto de todas as páginas do PDF
+            texto_completo = ""
+            for page in pdf.pages:
+                texto_completo += page.extract_text() + "\n"
 
-                # Procurar os números na página
-                for numero in numeros_procurados:
-                    if str(numero) in text:
-                        print(f"⚠️ Número encontrado no PDF (Página {page_num + 1}): {numero}")
+            # Procurar os números no texto combinado
+            for numero in numeros_procurados:
+                if str(numero) in texto_completo:
+                    print(f"⚠️ Número encontrado no PDF: {numero}")
 
-                        # Verificar qualquer situação associada ao número
-                        padrao = rf"{numero}.*?Situação:\s+([^\n]+)"  # Captura o texto após "Situação:" até o fim da linha
-                        match = re.search(padrao, text, re.DOTALL)
+                    # Verificar qualquer situação associada ao número
+                    padrao = rf"{numero}.*?Situação:\s+([^\n]+)"
+                    match = re.search(padrao, texto_completo, re.DOTALL)
+                    
+                    if match:
+                        situacao = match.group(1).strip()
+                        print(f"✅ Situação do número {numero}: {situacao}")
                         
-                        if match:
-                            situacao = match.group(1).strip()
-                            print(f"✅ Situação do número {numero}: {situacao}")
-                        else:
-                            print(f"⚠️ Situação do número {numero} não encontrada na mesma página.")
+                        # Adiciona os dados na lista
+                        resultados.append({
+                            "EMPRESA": nome_empresa,
+                            "DÍVIDA ATIVA": "SIM",
+                            "NUMERO DO PROCESSO": numero,
+                            "SITUAÇÃO": situacao
+                        })
+                    else:
+                        print(f"⚠️ Situação do número {numero} não encontrada.")
+        
+        # Criar a pasta de destino se não existir
+        if not os.path.exists(pasta_destino):
+            os.makedirs(pasta_destino)
+        
+        # Salvar resultados no Excel
+        if resultados:
+            caminho_excel = os.path.join(pasta_destino, f"{nome_empresa}_resultados.xlsx")
+            df = pd.DataFrame(resultados)
+            df.to_excel(caminho_excel, index=False)
+            print(f"✅ Resultados salvos em: {caminho_excel}")
+        else:
+            print(f"⚠️ Nenhum dado encontrado para a empresa: {nome_empresa}")
+
     except Exception as e:
         print(f"Erro ao abrir ou processar o arquivo PDF {caminho_pdf}: {e}")
 
