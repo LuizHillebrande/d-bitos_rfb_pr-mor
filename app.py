@@ -49,7 +49,7 @@ def renomear_pdfs(pasta):
 # Defina a pasta onde estão os PDFs
 pasta_pdfs = "debitos"
 
-def consultar_pdf_da_empresa(nome_empresa):
+def consultar_pdf_da_empresa(nome_empresa, numeros_procurados):
     # Caminho da pasta onde os PDFs foram baixados/descompactados
     pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
@@ -64,42 +64,66 @@ def consultar_pdf_da_empresa(nome_empresa):
         print(f"🔍 PDF encontrado: {nome_pdf_proximo} (Similaridade: {score}%)")
 
         # Aqui você pode usar uma biblioteca para abrir o PDF, por exemplo, pdfplumber
-        abrir_pdf(caminho_pdf)
+        abrir_pdf(caminho_pdf, numeros_procurados)
     else:
         print(f"⚠️ Nenhum PDF encontrado para a empresa '{nome_empresa}'.")
 
 #busca os numeros de dividas ativas aqui
-def abrir_pdf(caminho_pdf):
+def abrir_pdf(caminho_pdf, numeros_procurados):
+    """
+    Abre o PDF, procura por números específicos no texto do PDF e captura todas as situações listadas após 'Situação:'.
+    """
     try:
-        # Usando pdfplumber para abrir e extrair informações do PDF
-        import pdfplumber
         with pdfplumber.open(caminho_pdf) as pdf:
             for page_num, page in enumerate(pdf.pages):
                 text = page.extract_text()
-                print(f"Conteúdo da página {page_num + 1}:")
-                print(text[:500])  # Exibe os primeiros 500 caracteres da página
-                print("=" * 50)  # Separador para facilitar a leitura do conteúdo
+                if not text:
+                    continue
+                
+                print(f"Analisando página {page_num + 1} do PDF...")
+
+                # Procurar os números na página
+                for numero in numeros_procurados:
+                    if str(numero) in text:
+                        print(f"⚠️ Número encontrado no PDF (Página {page_num + 1}): {numero}")
+
+                        # Verificar qualquer situação associada ao número
+                        padrao = rf"{numero}.*?Situação:\s+([^\n]+)"  # Captura o texto após "Situação:" até o fim da linha
+                        match = re.search(padrao, text, re.DOTALL)
+                        
+                        if match:
+                            situacao = match.group(1).strip()
+                            print(f"✅ Situação do número {numero}: {situacao}")
+                        else:
+                            print(f"⚠️ Situação do número {numero} não encontrada na mesma página.")
     except Exception as e:
-        print(f"Erro ao abrir o arquivo PDF {caminho_pdf}: {e}")
-    
+        print(f"Erro ao abrir ou processar o arquivo PDF {caminho_pdf}: {e}")
+
+
 
 def processar_excel_e_abrir_pdf():
-    # Caminho do diretório onde os arquivos Excel estão armazenados
+    """
+    Processa os arquivos Excel na pasta 'dividas ativas', extrai os números das dívidas e
+    busca por esses números nos PDFs relacionados.
+    """
     pasta_destino = "dividas ativas"
     
-    # Iterando pelos arquivos na pasta 'dividas ativas' para pegar o nome do Excel
     for excel_file in os.listdir(pasta_destino):
         if excel_file.endswith('.xlsx'):
-            # Extrair o nome da empresa a partir do nome do arquivo Excel (sem a extensão .xlsx)
-            nome_empresa = os.path.splitext(excel_file)[0]
+            # Caminho completo do arquivo Excel
+            caminho_excel = os.path.join(pasta_destino, excel_file)
+
+            # Ler os números do Excel
+            df = pd.read_excel(caminho_excel)
+            numeros_procurados = df["Inscrição da Dívida"].astype(str).tolist()
             
-            # Remover " LTDA" do nome da empresa (para corresponder ao nome no PDF)
-            nome_empresa = nome_empresa.replace(" LTDA", "")
-            
-            print(f"Nome da empresa extraído do Excel: {nome_empresa}")
-            
-            # Agora consultar o PDF correspondente
-            consultar_pdf_da_empresa(nome_empresa)
+            # Extrair o nome da empresa a partir do nome do arquivo Excel
+            nome_empresa = os.path.splitext(excel_file)[0].replace(" LTDA", "")
+            print(f"Procurando números no PDF para a empresa: {nome_empresa}")
+
+            # Localizar o PDF correspondente
+            consultar_pdf_da_empresa(nome_empresa, numeros_procurados)
+
 
 def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     # Salvar a lista de números em um arquivo Excel
