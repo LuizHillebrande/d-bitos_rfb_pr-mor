@@ -149,6 +149,110 @@ def processar_excel_e_abrir_pdf():
             # Localizar o PDF correspondente
             consultar_pdf_da_empresa(nome_empresa, numeros_procurados)
 
+#CONSULTA PDF DOS CODIGOS FISCAIS
+def consultar_pdf_da_empresa_codigos(nome_empresa, numeros_procurados):
+    """
+    Procura o PDF correspondente ao nome da empresa e chama a função para extrair os valores.
+    """
+    # Caminho da pasta onde os PDFs estão
+    pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+
+    # Listar todos os arquivos PDF na pasta
+    arquivos_pdf = [f for f in os.listdir(pasta_debitos) if f.endswith('.pdf')]
+
+    # Tentar encontrar o PDF mais próximo usando fuzzy matching
+    nome_pdf_proximo, score = process.extractOne(nome_empresa, arquivos_pdf)
+
+    if score >= 80:  # Define um limite mínimo de similaridade
+        caminho_pdf = os.path.join(pasta_debitos, nome_pdf_proximo)
+        print(f"🔍 PDF encontrado: {nome_pdf_proximo} (Similaridade: {score}%)")
+
+        # Chamar a função para processar o PDF
+        abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa)
+    else:
+        print(f"⚠️ Nenhum PDF encontrado para a empresa '{nome_empresa}'.")
+
+def abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa):
+    """
+    Abre o PDF, busca os códigos fiscais e PA - EXERC. e extrai o saldo devedor consignado.
+    """
+    resultados = []  # Lista para armazenar os resultados
+
+    try:
+        with pdfplumber.open(caminho_pdf) as pdf:
+            # Combinar o texto de todas as páginas do PDF
+            texto_completo = ""
+            for page in pdf.pages:
+                texto_completo += page.extract_text() + "\n"
+
+            # Iterar pelos códigos fiscais e PA-EXERC. fornecidos
+            for codigo, pa_exerc in numeros_procurados:
+                # Regex para encontrar a linha correspondente no PDF
+                padrao = rf"{codigo}\s+{pa_exerc}.*?([\d.,]+)\s*DEVEDOR$"
+                match = re.search(padrao, texto_completo, re.MULTILINE)
+
+                if match:
+                    saldo_devedor = match.group(1).strip()
+                    print(f"✅ Código: {codigo}, PA-EXERC.: {pa_exerc}, Saldo: {saldo_devedor}")
+                    
+                    # Adicionar o resultado
+                    resultados.append({
+                        "Empresa": nome_empresa,
+                        "Código Fiscal": codigo,
+                        "PA - Exercício": pa_exerc,
+                        "Saldo Devedor Consignado": saldo_devedor
+                    })
+                else:
+                    print(f"⚠️ Nenhuma linha encontrada para Código: {codigo}, PA-EXERC.: {pa_exerc}")
+
+        # Salvar os resultados em um Excel
+        if resultados:
+            salvar_resultados_excel(resultados, nome_empresa)
+        else:
+            print(f"⚠️ Nenhum dado extraído do PDF para a empresa: {nome_empresa}")
+
+    except Exception as e:
+        print(f"Erro ao abrir ou processar o PDF {caminho_pdf}: {e}")
+
+
+
+def salvar_resultados_excel(resultados, nome_empresa):
+    """
+    Salva os resultados extraídos em um arquivo Excel.
+    """
+    # Criar um DataFrame com os resultados
+    df = pd.DataFrame(resultados)
+
+    # Caminho para salvar os resultados
+    pasta_destino = os.path.join(os.getcwd(), 'resultados_codigos')
+    if not os.path.exists(pasta_destino):
+        os.makedirs(pasta_destino)
+
+    caminho_excel = os.path.join(pasta_destino, f"{nome_empresa}_codigos_fiscais.xlsx")
+    df.to_excel(caminho_excel, index=False)
+    print(f"✅ Resultados salvos em: {caminho_excel}")
+
+
+def processar_empresas_codigos():
+    """
+    Itera sobre os arquivos Excel na pasta 'codigos fiscais' e processa os PDFs correspondentes.
+    """
+    pasta_codigos = os.path.join(os.getcwd(), 'codigos fiscais')
+
+    for arquivo_excel in os.listdir(pasta_codigos):
+        if arquivo_excel.endswith('.xlsx'):
+            caminho_excel = os.path.join(pasta_codigos, arquivo_excel)
+            nome_empresa = os.path.splitext(arquivo_excel)[0]
+
+            # Ler o Excel para obter os códigos fiscais e PA-EXERC.
+            df = pd.read_excel(caminho_excel)
+
+            numeros_procurados = list(zip(df["Codigos Fiscais"], df["PA - EXERC."]))
+
+            print(f"🔍 Processando empresa: {nome_empresa}")
+            consultar_pdf_da_empresa_codigos(nome_empresa, numeros_procurados)
+
+
 #salva os debitos de divida ativa
 def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     # Salvar a lista de números em um arquivo Excel
@@ -158,9 +262,6 @@ def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     print(f"Arquivo salvo em {caminho_arquivo}")
 
 #codigos fiscais salvando
-
-import pandas as pd
-import os
 
 def salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos):
     # Verifique se as listas têm o mesmo comprimento
@@ -370,9 +471,11 @@ def login():
             # Remover a parte "Pendência da situação fiscal - " do nome
             nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
             nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
-            
+            pasta_debitos = os.path.join(os.getcwd(), 'debitos')
             pasta_codigos = "codigos fiscais"
             salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
+            processar_empresas_codigos()
+            
 
 
         except Exception as i:
