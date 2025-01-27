@@ -149,7 +149,7 @@ def processar_excel_e_abrir_pdf():
             # Localizar o PDF correspondente
             consultar_pdf_da_empresa(nome_empresa, numeros_procurados)
 
-
+#salva os debitos de divida ativa
 def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     # Salvar a lista de números em um arquivo Excel
     df = pd.DataFrame(lista_numeros, columns=["Inscrição da Dívida"])
@@ -157,6 +157,33 @@ def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     df.to_excel(caminho_arquivo, index=False)
     print(f"Arquivo salvo em {caminho_arquivo}")
 
+#codigos fiscais salvando
+
+import pandas as pd
+import os
+
+def salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos):
+    # Verifique se as listas têm o mesmo comprimento
+    if len(lista_numeros) != len(lista_pa_exercicio):
+        raise ValueError("As listas de números e de PA - EXERC. devem ter o mesmo comprimento.")
+
+    # Verificar se o diretório existe, se não, criar o diretório
+    if not os.path.exists(pasta_codigos):
+        os.makedirs(pasta_codigos)
+    
+    # Salvar a lista de números e PA em um DataFrame
+    df = pd.DataFrame({
+        "Codigos Fiscais": lista_numeros,  # Lista de números
+        "PA - EXERC.": lista_pa_exercicio  # Lista de PA - Exercicio
+    })
+    
+    # Definir o caminho do arquivo Excel
+    caminho_arquivo = os.path.join(pasta_codigos, f"{nome_arquivo}.xlsx")
+    
+    # Salvar o DataFrame no arquivo Excel
+    df.to_excel(caminho_arquivo, index=False)
+    
+    print(f"Arquivo salvo em {caminho_arquivo}")
 
 def descompactar_arquivo_zip(download_folder):
     # Descompactar o arquivo ZIP
@@ -329,6 +356,25 @@ def login():
             )
             debitos_sief.click()
             print('CLICADO EM DEBITOS SIEF')
+            numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+            lista_numeros = [numero.text for numero in numeros]
+
+            print("Códigos fiscais:", lista_numeros, "\n")
+
+            pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
+            lista_pa_exercicio = [pa.text for pa in pa_exercicio]
+            print("Pa - exercício = ", lista_pa_exercicio, "\n")
+
+            empresa_element = driver.find_element(By.XPATH, "//h5[@id='pendencia-fiscal___BV_modal_title_']")
+            nome_empresa_completo = empresa_element.text
+            # Remover a parte "Pendência da situação fiscal - " do nome
+            nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
+            nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
+            
+            pasta_codigos = "codigos fiscais"
+            salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
+
+
         except Exception as i:
             print('n cliquei em debitos sie F')
             print(f'Erro{i}')
