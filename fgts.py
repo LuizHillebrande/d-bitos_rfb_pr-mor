@@ -20,6 +20,12 @@ import os
 import shutil
 from thefuzz import process 
 import undetected_chromedriver as uc
+import openpyxl as opx
+
+wb_fgts = opx.load_workbook('EMPRESAS FGTS.xlsx')
+
+# Para acessar a planilha
+sheet_wb = wb_fgts['Página1']
 
 imagem_alvo = r"certificado_esperado.png"
 
@@ -71,7 +77,6 @@ def pegar_debitos_fgts():
     )
     entry_gov.click()
 
-    
 
     entry_certificate = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@id='login-certificate']"))
@@ -85,5 +90,43 @@ def pegar_debitos_fgts():
     pressionar_ate_encontrar(imagem_alvo, intervalo)
 
     sleep(5)
-    driver.quit()
+
+    definir = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button is-primary']"))
+    )
+    definir.click
+
+    for linha in sheet_wb.iter_rows(min_row=2, max_row=500):
+        razao_social = linha[1].value
+        cnpj = linha[2].value
+
+        try: 
+            trocar_perfil = WebDriverWait(driver,2).until(
+            EC.element_to_be_clickable((By.XPATH,"//button[@class=' br-button secondary botao-barra-perfil']"))
+            )
+            trocar_perfil.click
+        except:
+            print('N tinha trocar perfil')
+
+
+        dropdown_perfil = WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.XPATH,"//div[@role='combobox']"))
+        )
+        dropdown_perfil.click()
+
+        procurador_option = driver.find_element(By.XPATH, "//span[@class='ng-option-label' and text()='Procurador']")
+
+        # Clicando no item
+        ActionChains(driver).move_to_element(procurador_option).click().perform()
+
+        input_cnpj = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH,"//input[@class='brx-input medium ng-untouched ng-pristine ng-invalid']"))
+        )
+        input_cnpj.click()
+        input_cnpj.send_keys(cnpj)
+
+
+
+        sleep(5)
+        driver.quit()
 pegar_debitos_fgts()
