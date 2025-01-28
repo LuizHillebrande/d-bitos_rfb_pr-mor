@@ -48,6 +48,9 @@ import os
 import pandas as pd
 import re
 
+import pandas as pd
+import re
+
 def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal):
     for arquivo in os.listdir(diretorio_codigos):
         if arquivo.endswith('.xlsx') or arquivo.endswith('.xls'):
@@ -60,15 +63,43 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal):
             if {'Empresa', 'Código Fiscal', 'PA - Exercício', 'Saldo Devedor Consignado'}.issubset(df.columns):
                 nome_empresa = df['Empresa'].iloc[0]  # Nome da empresa
 
+                # Função para ajustar o formato do PA - Exercício
+                def formatar_pa_exercicio(pa_exercicio):
+                    try:
+                        # Se o formato for DDD/MM/YYYY, transforma em MM/YYYY
+                        if len(str(pa_exercicio).split('/')) == 3:  # Caso DDD/MM/YYYY
+                            return '/'.join(str(pa_exercicio).split('/')[1:])
+                        # Se for MM/YYYY, deixa como está
+                        return str(pa_exercicio)
+                    except Exception as e:
+                        print(f"Erro ao formatar PA - Exercício: {pa_exercicio}, erro: {e}")
+                        return None
+
+                # Aplica a função para formatar a coluna 'PA - Exercício'
+                df['PA - Exercício'] = df['PA - Exercício'].apply(formatar_pa_exercicio)
+
+                # Filtra os dados para agrupar os que têm o mesmo mês/ano
+                meses_agrupados = df.groupby('PA - Exercício')
+
+                # Verificar e imprimir os agrupamentos
+                for pa_exercicio, grupo in meses_agrupados:
+                    print(f"\nGrupo para PA - Exercício {pa_exercicio}:")
+                    print(grupo[['Empresa', 'PA - Exercício', 'Saldo Devedor Consignado']])
+
                 # Gera mensagem personalizada para cada linha
                 mensagem = f"Olá {nome_empresa},\n"
                 for _, row in df.iterrows():
                     codigo_fiscal_completo = str(row['Código Fiscal']).strip()
                     pa_exercicio = row['PA - Exercício']
-                    saldo_devedor = row['Saldo Devedor Consignado']
+                    
+                    # Converte saldo_devedor, substituindo vírgula por ponto e tratando como float
+                    saldo_devedor = str(row['Saldo Devedor Consignado']).replace(',', '.')
+                    try:
+                        saldo_devedor = float(saldo_devedor)
+                    except ValueError:
+                        saldo_devedor = 0.0  # Caso o valor não seja numérico, considera como zero
 
                     # Garante que o código esteja no formato esperado
-                    # Remove descrições e mantém o formato xxxx-xx
                     match = re.match(r'(\d+)[-/](\d+)', codigo_fiscal_completo)
                     if match:
                         codigo_fiscal_formatado_original = f"{match.group(1)}-{match.group(2)}"
@@ -76,10 +107,6 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal):
                     else:
                         codigo_fiscal_formatado_original = codigo_fiscal_completo
                         codigo_fiscal_com_variacao = codigo_fiscal_completo
-
-                    # Imprime os dois formatos para verificar
-                    print(f"Código fiscal formatado (original): {codigo_fiscal_formatado_original}")
-                    print(f"Código fiscal formatado (com barra): {codigo_fiscal_com_variacao}")
 
                     # Verifica em qual tabela o código está presente (em qualquer formato)
                     if (codigo_fiscal_formatado_original in tabela_depto_pessoal['Código de receita'].astype(str).values or
@@ -89,24 +116,21 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal):
                           codigo_fiscal_com_variacao in tabela_fiscal['Código de receita'].astype(str).values):
                         tipo_debito = "relacionado ao fiscal"
                     else:
-                        # Usa a descrição após o código como mensagem
-                        descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo)  # Remove o código e o traço/barra
+                        descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo)
                         tipo_debito = f"relacionado a {descricao}"
 
-                    # Adiciona à mensagem
-                    mensagem += (
-                        f"Você tem um débito no valor de {saldo_devedor} com vencimento em {pa_exercicio}, "
-                        f"{tipo_debito}.\n"
-                    )
+                    # Adiciona à mensagem apenas se o saldo devedor for diferente de zero
+                    if saldo_devedor > 0:
+                        mensagem += (
+                            f"Você tem um débito no valor de {saldo_devedor:.2f} com vencimento em {pa_exercicio}, "
+                            f"{tipo_debito}.\n"
+                        )
 
                 print(f"Mensagem para {nome_empresa}:\n{mensagem}\n")
             else:
                 print(f"O arquivo {arquivo} não possui as colunas esperadas.")
 
-# Exemplo de chamada
-# criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal)
 
 
 # Chamada da função
 criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal)
-
