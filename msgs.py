@@ -44,7 +44,11 @@ tabela_fiscal = pd.read_excel(arquivo_tabelas, sheet_name='Fiscal')
 
 import re
 
-def criar_msgs_codigos():
+import os
+import pandas as pd
+import re
+
+def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal):
     for arquivo in os.listdir(diretorio_codigos):
         if arquivo.endswith('.xlsx') or arquivo.endswith('.xls'):
             caminho_arquivo = os.path.join(diretorio_codigos, arquivo)
@@ -59,20 +63,30 @@ def criar_msgs_codigos():
                 # Gera mensagem personalizada para cada linha
                 mensagem = f"Olá {nome_empresa},\n"
                 for _, row in df.iterrows():
-                    codigo_fiscal_completo = row['Código Fiscal']
+                    codigo_fiscal_completo = str(row['Código Fiscal']).strip()
                     pa_exercicio = row['PA - Exercício']
                     saldo_devedor = row['Saldo Devedor Consignado']
 
-                    # Substitui o hífen por barra e remove a descrição
-                    codigo_fiscal_formatado = re.sub(r'(\d+)-(\d+)\s*-\s*.*', r'\1/\2', codigo_fiscal_completo)
+                    # Garante que o código esteja no formato esperado
+                    # Remove descrições e mantém o formato xxxx-xx
+                    match = re.match(r'(\d+)[-/](\d+)', codigo_fiscal_completo)
+                    if match:
+                        codigo_fiscal_formatado_original = f"{match.group(1)}-{match.group(2)}"
+                        codigo_fiscal_com_variacao = f"{match.group(1)}/{match.group(2)}"
+                    else:
+                        codigo_fiscal_formatado_original = codigo_fiscal_completo
+                        codigo_fiscal_com_variacao = codigo_fiscal_completo
 
-                    # Imprime para verificar o código fiscal formatado
-                    print(f"Código fiscal formatado: {codigo_fiscal_formatado}")
-                    
-                    # Verifica em qual tabela o código está presente
-                    if codigo_fiscal_formatado in tabela_depto_pessoal['Código de receita'].astype(str).values:
+                    # Imprime os dois formatos para verificar
+                    print(f"Código fiscal formatado (original): {codigo_fiscal_formatado_original}")
+                    print(f"Código fiscal formatado (com barra): {codigo_fiscal_com_variacao}")
+
+                    # Verifica em qual tabela o código está presente (em qualquer formato)
+                    if (codigo_fiscal_formatado_original in tabela_depto_pessoal['Código de receita'].astype(str).values or
+                        codigo_fiscal_com_variacao in tabela_depto_pessoal['Código de receita'].astype(str).values):
                         tipo_debito = "relacionado ao departamento pessoal"
-                    elif codigo_fiscal_formatado in tabela_fiscal['Código de receita'].astype(str).values:
+                    elif (codigo_fiscal_formatado_original in tabela_fiscal['Código de receita'].astype(str).values or
+                          codigo_fiscal_com_variacao in tabela_fiscal['Código de receita'].astype(str).values):
                         tipo_debito = "relacionado ao fiscal"
                     else:
                         # Usa a descrição após o código como mensagem
@@ -89,6 +103,10 @@ def criar_msgs_codigos():
             else:
                 print(f"O arquivo {arquivo} não possui as colunas esperadas.")
 
+# Exemplo de chamada
+# criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal)
+
+
 # Chamada da função
-criar_msgs_codigos()
+criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal)
 
