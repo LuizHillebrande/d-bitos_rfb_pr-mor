@@ -118,24 +118,34 @@ def pegar_debitos_fgts():
 
     pressionar_ate_encontrar(imagem_alvo, intervalo)
 
-    sleep(5)
+    sleep(3)
 
     definir = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button is-primary']"))
     )
-    definir.click
+    definir.click()
+    print('Clicado em definir')
 
     for linha in sheet_wb.iter_rows(min_row=2, max_row=500):
         razao_social = linha[1].value
         cnpj = linha[2].value
 
-        try: 
-            trocar_perfil = WebDriverWait(driver,10).until(
-            EC.element_to_be_clickable((By.XPATH,"//button[@class=' br-button secondary botao-barra-perfil']"))
-            )
-            trocar_perfil.click
-        except:
-            print('N tinha trocar perfil')
+        
+        from selenium.common.exceptions import StaleElementReferenceException
+
+        try:
+            for _ in range(3):  # Tenta encontrar o botão até 3 vezes
+                try:
+                    trocar_perfil = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'botao-barra-perfil')]"))
+                    )
+                    trocar_perfil.click()
+                    print('Clicado em "Trocar Perfil"')
+                    break  # Sai do loop se conseguiu clicar
+                except StaleElementReferenceException:
+                    print("Elemento ficou obsoleto, tentando novamente...")
+        except Exception as e:
+            print(f"Erro ao clicar em 'Trocar Perfil': {e}")
 
 
         dropdown_perfil = WebDriverWait(driver, 5).until(
@@ -159,6 +169,7 @@ def pegar_debitos_fgts():
             EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button is-primary']"))
         )
         selecionar.click()
+        sleep(1)
 
         gestao_guias = WebDriverWait(driver,5).until(
             EC.element_to_be_clickable((By.XPATH,"//div[contains(@class, 'amplo cardListItem')]//span[contains(text(), 'Gestão de Guias')]"))
