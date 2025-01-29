@@ -23,6 +23,7 @@ import undetected_chromedriver as uc
 import openpyxl as opx
 from openpyxl import Workbook, load_workbook
 from datetime import datetime
+from selenium.webdriver.chrome.options import Options
 
 wb_fgts = opx.load_workbook('EMPRESAS FGTS.xlsx')
 
@@ -95,7 +96,24 @@ def pressionar_ate_encontrar(imagem, intervalo=0.5):
             time.sleep(intervalo)
 
 def pegar_debitos_fgts():
-    driver = uc.Chrome()
+
+
+    mes_atual = datetime.now().strftime("%m-%Y")
+
+    # Caminho para o diretório de downloads
+    diretorio_download = os.path.join(os.getcwd(), f"debitos_fgts_{mes_atual}")
+
+    # Cria o diretório se não existir
+    if not os.path.exists(diretorio_download):
+        os.makedirs(diretorio_download)
+
+    # Configurações do Chrome para definir o diretório de download
+    chrome_options = Options()
+    chrome_options.add_argument(f'--download-default-directory={diretorio_download}')
+
+    # Inicializa o WebDriver com as configurações
+    driver = uc.Chrome(options=chrome_options)
+    driver.get("https://fgtsdigital.sistema.gov.br/portal/login")
     driver.get("https://fgtsdigital.sistema.gov.br/portal/login")
     driver.maximize_window()
 
@@ -196,7 +214,50 @@ def pegar_debitos_fgts():
                 salvar_sem_debitos_fgts(razao_social, mes)
                 print(f"Empresa {razao_social} registrada como sem débitos FGTS para o mês {mes}.")
         except Exception:
-            print(f"Empresa {razao_social} possui débitos ou não foi possível verificar.")
+            print(f"Empresa {razao_social} possui débitos")
+            pesquisar = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button secondary ml-2']"))
+            )
+            pesquisar.click()
+
+            emitir_guia = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//button[@class='ml-2 br-button primary']"))
+            )
+            emitir_guia.click()
+            print('Emitindo guia para a empresa: ', razao_social)
+            sleep(5)
+
+            try:
+                valor_total = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.XPATH, "//span[contains(text(),',')]"))  # Pegando valores numéricos
+                ).text
+
+                vencimento = WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.XPATH, "//span[@title]"))
+                ).text
+
+                print(f"Empresa {razao_social} tem débitos no valor de {valor_total} com vencimento para {vencimento}")
+
+                # Criar/abrir arquivo Excel
+                nome_arquivo = "debitos_empresas.xlsx"
+
+                try:
+                    wb = opx.load_workbook(nome_arquivo)  # Abre o arquivo se existir
+                    sheet = wb.active
+                except FileNotFoundError:
+                    wb = opx.Workbook()  # Cria um novo se não existir
+                    sheet = wb.active
+                    sheet.append(["Razão Social", "Valor Total", "Vencimento"])  # Cabeçalhos
+
+                # Adiciona os dados
+                sheet.append([razao_social, valor_total, vencimento])
+
+                # Salva o arquivo
+                wb.save(nome_arquivo)
+                print(f"Dados salvos em {nome_arquivo}")
+
+            except Exception as e:
+                print(f"Erro ao extrair os dados: {e}")
 
         driver.get('https://fgtsdigital.sistema.gov.br/portal/servicos')
 
