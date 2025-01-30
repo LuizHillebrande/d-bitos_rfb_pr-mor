@@ -132,11 +132,19 @@ def pegar_debitos_fgts():
     sleep(3)
 
     pyautogui.click(738,191, duration=2)
-    sleep(3)
+    sleep(5)
 
     pressionar_ate_encontrar(imagem_alvo, intervalo)
 
     sleep(3)
+
+    try:
+        aceitar_cookies = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button primary small']"))
+        )
+        aceitar_cookies.click()
+    except Exception as e:
+        print('Erro ao aceitar cookies', e)
 
     definir = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button is-primary']"))
@@ -189,75 +197,93 @@ def pegar_debitos_fgts():
         selecionar.click()
         sleep(1)
 
-        gestao_guias = WebDriverWait(driver,5).until(
-            EC.element_to_be_clickable((By.XPATH,"//div[contains(@class, 'amplo cardListItem')]//span[contains(text(), 'Gestão de Guias')]"))
+        consultas_empregador = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH,"//div[contains(@class, 'amplo cardListItem')]//span[contains(text(), 'Consultas do Empregador')]"))
         )
-        gestao_guias.click()
+        consultas_empregador.click()
         sleep(2)
 
-        emissao_guia_rapida = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'amplo cardListItem')]//span[contains(text(), 'Emissão de Guia Rápida')]"))
+        consultar_competencia = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'amplo cardListItem')]//span[contains(text(), 'Consulta de Competências de Referência')]"))
         )
 
         # Clicar no elemento
-        emissao_guia_rapida.click()
+        consultar_competencia.click()
+
+        #elemento completo
+        elemento = driver.find_element(By.XPATH, "//label[@for='completo']")
+        actions = ActionChains(driver)
+        actions.move_to_element(elemento).click().perform()
+        sleep(1)
+
+        #tirar o regular
+        regular = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//label[@for='regular']"))
+        )
+        actions = ActionChains(driver)
+        actions.move_to_element(regular).click().perform()
+        sleep(3)
+
+        filtrar = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button secondary']"))
+        )
+        filtrar.click()
         
-        mes = datetime.now().strftime("%m-%Y")
 
-        try:
-            # Verificar se o texto contém algo relacionado a "débitos"
-            texto_elemento = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'description') and contains(text(), 'débito')]"))
-            )
-            
-            if texto_elemento:
-                salvar_sem_debitos_fgts(razao_social, mes)
-                print(f"Empresa {razao_social} registrada como sem débitos FGTS para o mês {mes}.")
-        except Exception:
-            print(f"Empresa {razao_social} possui débitos")
-            pesquisar = WebDriverWait(driver,5).until(
-                EC.element_to_be_clickable((By.XPATH,"//button[@class='br-button secondary ml-2']"))
-            )
-            pesquisar.click()
+        sleep(3)
 
-            emitir_guia = WebDriverWait(driver,5).until(
-                EC.element_to_be_clickable((By.XPATH,"//button[@class='ml-2 br-button primary']"))
-            )
-            emitir_guia.click()
-            print('Emitindo guia para a empresa: ', razao_social)
-            sleep(5)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        sleep(2)  # Aguarde um pouco para garantir que o conteúdo foi carregado
 
+        # Tentar localizar o elemento
+        #elemento = WebDriverWait(driver, 10).until(
+            #EC.element_to_be_clickable((By.CSS_SELECTOR, ".ng-arrow-wrapper"))
+        #)
+        elemento = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH, "(//div[@class='ng-input'])[1]"))
+        )
+
+        # Realizar a ação no elemento
+        ActionChains(driver).move_to_element(elemento).click().perform()
+        sleep(2)
+
+        checkbox_10 = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "(//div[@class='ng-value']//span[@class='ng-value-label' and text()='10'])[1]"))
+        )
+        checkbox_10.click()  # Clicando no valor "10"
+        
+        driver.execute_script("window.scrollBy(0, -500);")
+        # Lista para armazenar os resultados
+        dados = []
+
+        # Encontra todas as linhas da tabela
+        linhas = driver.find_elements(By.XPATH, "//datatable-body-row")
+
+        for linha in linhas:
             try:
-                valor_total = WebDriverWait(driver, 10).until(
-                    EC.visibility_of_element_located((By.XPATH, "//span[contains(text(),',')]"))  # Pegando valores numéricos
-                ).text
+                # Extrai o mês de referência (supondo que seja a terceira célula)
+                mes_ref = linha.find_element(By.XPATH, ".//datatable-body-cell[3]").text.strip()
+                
+                # Extrai o valor do débito (localizando pelo estilo de cor vermelha)
+                valor_debito = linha.find_element(By.XPATH, ".//span[@style='color: #b30000; font-weight: 600;']").text.strip()
 
-                vencimento = WebDriverWait(driver, 10).until(
-                    EC.visibility_of_element_located((By.XPATH, "//span[@title]"))
-                ).text
+                # Remove caracteres indesejados no valor
+                valor_debito = valor_debito.replace(".", "").replace(",", ".")
 
-                print(f"Empresa {razao_social} tem débitos no valor de {valor_total} com vencimento para {vencimento}")
-
-                # Criar/abrir arquivo Excel
-                nome_arquivo = "debitos_empresas.xlsx"
-
-                try:
-                    wb = opx.load_workbook(nome_arquivo)  # Abre o arquivo se existir
-                    sheet = wb.active
-                except FileNotFoundError:
-                    wb = opx.Workbook()  # Cria um novo se não existir
-                    sheet = wb.active
-                    sheet.append(["Razão Social", "Valor Total", "Vencimento"])  # Cabeçalhos
-
-                # Adiciona os dados
-                sheet.append([razao_social, valor_total, vencimento])
-
-                # Salva o arquivo
-                wb.save(nome_arquivo)
-                print(f"Dados salvos em {nome_arquivo}")
-
+                # Adiciona os dados à lista
+                dados.append([razao_social, mes_ref, float(valor_debito)])
+            
             except Exception as e:
-                print(f"Erro ao extrair os dados: {e}")
+                print(f'Empresa {razao_social} sem débitos')
+                print(f"Erro ao processar linha: {e}")
+
+        # Criando um DataFrame e salvando no Excel
+        df = pd.DataFrame(dados, columns=["Nome da Empresa", "Mês Ref.", "Valor Débitos"])
+        df.to_excel("debitos_fgts.xlsx", index=False)
+
+        print("Arquivo Excel salvo com sucesso!")
+
+        mes = datetime.now().strftime("%m-%Y")
 
         driver.get('https://fgtsdigital.sistema.gov.br/portal/servicos')
 
@@ -266,3 +292,6 @@ def pegar_debitos_fgts():
         
     driver.quit()
 pegar_debitos_fgts()
+
+
+    
