@@ -21,42 +21,30 @@ import shutil
 from thefuzz import process 
 
 
-
-def extrair_nome_empresa_e_cnpj(nome_arquivo):
+def extrair_nome_empresa(nome_arquivo):
     """
-    Extrai o nome da empresa e o CNPJ do nome do arquivo PDF.
-    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Arquivo.pdf'.
+    Extrai o nome da empresa do nome do arquivo PDF.
+    Remove o prefixo 'situacao_fiscal--CNPJ-' e qualquer código no final.
     """
-    # Expressão regular para capturar o CNPJ
-    cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
-    if cnpj:
-        cnpj = cnpj.group(1)  # Extrai o CNPJ
-
-    # Remove o prefixo 'situacao_fiscal--CNPJ-' e qualquer código no final
-    nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
+    nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)  # Remove CNPJ e prefixo
     nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
     
-    return nome_limpo.strip(), cnpj
+    return nome_limpo.strip()
 
-def renomear_pdfs_com_cnpj(pasta):
+def renomear_pdfs(pasta):
     """
-    Itera sobre todos os PDFs da pasta e renomeia, usando o CNPJ como ID único.
+    Itera sobre todos os PDFs da pasta e renomeia removendo prefixos e códigos desnecessários.
     """
     for arquivo in os.listdir(pasta):
         if arquivo.endswith(".pdf"):
             caminho_antigo = os.path.join(pasta, arquivo)
-            nome_empresa, cnpj = extrair_nome_empresa_e_cnpj(arquivo)
+            nome_extraido = extrair_nome_empresa(arquivo)
+            novo_nome = f"{nome_extraido}.pdf"
+            caminho_novo = os.path.join(pasta, novo_nome)
             
-            # Criar o novo nome do arquivo com CNPJ
-            if cnpj:
-                novo_nome = f"{cnpj}_{nome_empresa}.pdf"
-                caminho_novo = os.path.join(pasta, novo_nome)
-                
-                # Renomeia o arquivo
-                os.rename(caminho_antigo, caminho_novo)
-                print(f"Renomeado: {arquivo} → {novo_nome}")
-            else:
-                print(f"Não foi possível extrair o CNPJ de: {arquivo}")
+            # Renomeia o arquivo
+            os.rename(caminho_antigo, caminho_novo)
+            print(f"Renomeado: {arquivo} → {novo_nome}")
 
 # Defina a pasta onde estão os PDFs
 pasta_pdfs = "debitos"
@@ -417,119 +405,92 @@ def login():
     sleep(5)
     descompactar_arquivo_zip(download_folder)
     sleep(2)
-    renomear_pdfs_com_cnpj(pasta_pdfs)
+    renomear_pdfs(pasta_pdfs)
     pyautogui.press('Esc')
     sleep(2)
 
-    pasta_cnpjs = os.path.join(os.getcwd(), 'cnpj_empresas')
-    if not os.path.exists(pasta_cnpjs):
-        os.makedirs(pasta_cnpjs)
-
-    # Nome do arquivo Excel
-    arquivo_excel_cnpjs = 'empresas_cnpj.xlsx'
-    caminho_excel_cnpjs = os.path.join(pasta_cnpjs, arquivo_excel_cnpjs)
-
-    # Lista para armazenar os dados das empresas
-    dados_cnpjs = []
-
-    # Encontrar todas as linhas de empresas
-    linhas_empresas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
-
-    # Iterar sobre cada linha de empresa
-    for linha in linhas_empresas:
-        # Dentro de cada linha, buscar o nome da empresa
-        nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
-        print(f"Nome da empresa: {nome_empresa}")
-        
-        # Pegar o CNPJ que está na segunda coluna
-        cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
-        cnpj = cnpj.replace('.', '').replace('/', '')
-        print(f"CNPJ: {cnpj}")
-        
-        # Adicionar os dados à lista
-        dados_cnpjs.append([nome_empresa, cnpj])
-
-        # Criar o DataFrame a partir da lista de dados
-        df_cnpjs = pd.DataFrame(dados_cnpjs, columns=['Nome da Empresa', 'CNPJ'])
-
-        # Salvar o DataFrame no arquivo Excel
-        df_cnpjs.to_excel(caminho_excel_cnpjs, index=False)
-
-        print(f"Arquivo Excel salvo em: {caminho_excel_cnpjs}")
-
-        lupas = WebDriverWait(driver,5).until(
-            EC.presence_of_all_elements_located((By.XPATH,"//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]"))
-        )
-        
-        for lupa in lupas:
-            WebDriverWait(driver, 5).until(EC.element_to_be_clickable(lupa)).click()
-
-
-            #tentando clicar em dívidas ativas
-            try: 
-                divida_ativa = WebDriverWait(driver,5).until(
-                    EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
-                )
-                divida_ativa.click()
-
-                # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
-                numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
-                lista_numeros = [numero.text for numero in numeros]
-
+    lupas = WebDriverWait(driver,5).until(
+        EC.presence_of_all_elements_located((By.XPATH,"//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]"))
+    )
     
-                # Gerar nome do arquivo com CNPJ e nome da empresa
-                nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
+    for lupa in lupas:
+        WebDriverWait(driver, 5).until(EC.element_to_be_clickable(lupa)).click()
 
-                pasta_destino = "dividas ativas"
-                if not os.path.exists(pasta_destino):
-                    os.makedirs(pasta_destino)
-                
-                salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
-                sleep(1)
-                processar_excel_e_abrir_pdf()
-                #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
-                #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
-                #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
-                #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
 
-            except Exception as e:
-                print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
+        #tentando clicar em dívidas ativas
+        try: 
+            divida_ativa = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
+            )
+            divida_ativa.click()
+
+            # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
+            numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+            lista_numeros = [numero.text for numero in numeros]
+
+            #pegando nome da empresa 
+            empresa_element = driver.find_element(By.XPATH, "//h5[@id='pendencia-fiscal___BV_modal_title_']")
+            nome_empresa_completo = empresa_element.text
+            # Remover a parte "Pendência da situação fiscal - " do nome
+            nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
+            nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
+
+            pasta_destino = "dividas ativas"
+            if not os.path.exists(pasta_destino):
+                os.makedirs(pasta_destino)
             
-            #tentando clicar em débitos(sief)
-            try:    
-                debitos_sief = WebDriverWait(driver,5).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
-                )
-                debitos_sief.click()
-                print('CLICADO EM DEBITOS SIEF')
-                numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
-                lista_numeros = [numero.text for numero in numeros]
+            salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
+            sleep(1)
+            processar_excel_e_abrir_pdf()
+            #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
+            #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
+            #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
+            #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
 
-                print("Códigos fiscais:", lista_numeros, "\n")
+        except Exception as e:
+            print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
+        
+        #tentando clicar em débitos(sief)
+        try:    
+            debitos_sief = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
+            )
+            debitos_sief.click()
+            print('CLICADO EM DEBITOS SIEF')
+            numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+            lista_numeros = [numero.text for numero in numeros]
 
-                pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
-                lista_pa_exercicio = [pa.text for pa in pa_exercicio]
-                print("Pa - exercício = ", lista_pa_exercicio, "\n")
+            print("Códigos fiscais:", lista_numeros, "\n")
 
-                nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
-                pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-                pasta_codigos = "codigos fiscais"
-                salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
-                processar_empresas_codigos()
+            pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
+            lista_pa_exercicio = [pa.text for pa in pa_exercicio]
+            print("Pa - exercício = ", lista_pa_exercicio, "\n")
 
-            except Exception as i:
-                print('n cliquei em debitos sie F')
-                print(f'Erro{i}')
+            empresa_element = driver.find_element(By.XPATH, "//h5[@id='pendencia-fiscal___BV_modal_title_']")
+            nome_empresa_completo = empresa_element.text
+            # Remover a parte "Pendência da situação fiscal - " do nome
+            nome_empresa = nome_empresa_completo.replace("Pendência da situação fiscal - ", "").strip()
+            nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", nome_empresa)
+            pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+            pasta_codigos = "codigos fiscais"
+            salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
+            processar_empresas_codigos()
+            
 
-            pyautogui.press('esc')
-            sleep(2)
 
+        except Exception as i:
+            print('n cliquei em debitos sie F')
+            print(f'Erro{i}')
 
-        sleep(3)
-        pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-
+        pyautogui.press('esc')
         sleep(2)
-        driver.quit()
+
+
+    sleep(3)
+    pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+
+    sleep(2)
+    driver.quit()
 
 from PIL import Image, ImageTk
 
