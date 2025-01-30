@@ -247,13 +247,23 @@ def pegar_debitos_fgts():
         ActionChains(driver).move_to_element(elemento).click().perform()
         sleep(2)
 
-        checkbox_10 = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "(//div[@class='ng-value']//span[@class='ng-value-label' and text()='10'])[1]"))
-        )
-        checkbox_10.click()  # Clicando no valor "10"
+        #checkbox_10 = WebDriverWait(driver, 10).until(
+            #EC.element_to_be_clickable((By.XPATH, "(//div[@class='ng-value']//span[@class='ng-value-label' and text()='10'])[1]"))
+        #)
+        #checkbox_10.click()  # Clicando no valor "10"
         
-        driver.execute_script("window.scrollBy(0, -500);")
-        # Lista para armazenar os resultados
+        campo_texto = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, "//input[@aria-autocomplete='list']"))
+        )
+
+        # Clique no campo para abrir a lista
+        campo_texto.click()
+
+        # Digite o valor que você deseja selecionar (por exemplo, '100')
+        campo_texto.send_keys("100")
+        pyautogui.press('enter')
+        sleep(3)
+
         dados = []
 
         # Encontra todas as linhas da tabela
@@ -272,16 +282,32 @@ def pegar_debitos_fgts():
 
                 # Adiciona os dados à lista
                 dados.append([razao_social, mes_ref, float(valor_debito)])
-            
+
             except Exception as e:
                 print(f'Empresa {razao_social} sem débitos')
                 print(f"Erro ao processar linha: {e}")
 
-        # Criando um DataFrame e salvando no Excel
-        df = pd.DataFrame(dados, columns=["Nome da Empresa", "Mês Ref.", "Valor Débitos"])
-        df.to_excel("debitos_fgts.xlsx", index=False)
+        # Criando um DataFrame com os novos dados
+        df_novos_dados = pd.DataFrame(dados, columns=["Nome da Empresa", "Mês Ref.", "Valor Débitos"])
 
-        print("Arquivo Excel salvo com sucesso!")
+        # Caminho do arquivo Excel
+        arquivo_excel = "debitos_fgts.xlsx"
+
+        # Verificar se o arquivo já existe
+        if os.path.exists(arquivo_excel):
+            # Se o arquivo já existe, carregar os dados existentes
+            df_existente = pd.read_excel(arquivo_excel)
+
+            # Concatenar os dados novos com os dados existentes
+            df_total = pd.concat([df_existente, df_novos_dados], ignore_index=True)
+
+            # Salvar o DataFrame atualizado
+            df_total.to_excel(arquivo_excel, index=False)
+        else:
+            # Se o arquivo não existe, criar um novo arquivo com os dados
+            df_novos_dados.to_excel(arquivo_excel, index=False)
+
+        print("Arquivo Excel atualizado com sucesso!")
 
         mes = datetime.now().strftime("%m-%Y")
 
