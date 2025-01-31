@@ -13,8 +13,6 @@ tabela_depto_pessoal = pd.read_excel(arquivo_tabelas, sheet_name='Depto Pessoal'
 tabela_fiscal = pd.read_excel(arquivo_tabelas, sheet_name='Fiscal')
 
 
-
-
 def salvar_mensagem(df_existente, nome_empresa, nova_mensagem, caminho_saida):
     # Lista de empresas já existentes no arquivo
     nomes_existentes = df_existente['Empresa'].tolist()
@@ -55,6 +53,12 @@ def criar_msgs(caminho_saida):
             # Garante que as colunas necessárias estão no DataFrame
             if {'EMPRESA', 'DÍVIDA ATIVA', 'NUMERO DO PROCESSO', 'SITUAÇÃO'}.issubset(df.columns):
                 nome_empresa = df['EMPRESA'].iloc[0]  # Considera que todas as linhas têm o mesmo nome de empresa
+                match = re.search(r'\d{14}', nome_empresa)
+
+                if match:
+                    nome_empresa = match.group(0)  # Retorna apenas o CNPJ encontrado
+                else:
+                    nome_empresa = None
                 
                 # Agrupa os processos pela mesma situação
                 situacoes = df.groupby('SITUAÇÃO')['NUMERO DO PROCESSO'].apply(list).to_dict()
@@ -67,7 +71,7 @@ def criar_msgs(caminho_saida):
 
                 df_existente = salvar_mensagem(df_existente, nome_empresa, mensagem.strip(), caminho_saida)
                 
-                print(f"Mensagem para {nome_empresa}:\n{mensagem}\n")
+                print(f"Mensagem para {nome_empresa} no arquivo {arquivo}:\n{mensagem}\n")
             else:
                 print(f"O arquivo {arquivo} não possui as colunas esperadas.")
             
@@ -89,6 +93,12 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
             if {'Empresa', 'Código Fiscal', 'PA - Exercício', 'Saldo Devedor Consignado'}.issubset(df.columns):
                 nome_empresa = df['Empresa'].iloc[0]
+                match = re.search(r'\d{14}', nome_empresa)
+
+                if match:
+                    nome_empresa = match.group(0)  # Retorna apenas o CNPJ encontrado
+                else:
+                    nome_empresa = None
 
                 # Função para ajustar o formato do PA - Exercício
                 def formatar_pa_exercicio(pa_exercicio):
@@ -155,7 +165,7 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                     mensagem += "\n"  # Separação entre meses
 
                 df_existente = salvar_mensagem(df_existente, nome_empresa, mensagem.strip(), caminho_saida)
-                print(f"Mensagem gerada para {nome_empresa}:\n{mensagem}\n")
+                print(f"Mensagem gerada para {nome_empresa} no arquivo {arquivo}:\n{mensagem}\n")
             else:
                 print(f"O arquivo {arquivo} não possui as colunas esperadas.")
 

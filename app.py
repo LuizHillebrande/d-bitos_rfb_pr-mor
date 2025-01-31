@@ -68,17 +68,30 @@ def consultar_pdf_da_empresa(nome_empresa, numeros_procurados):
     # Listar todos os arquivos PDF na pasta
     arquivos_pdf = [f for f in os.listdir(pasta_debitos) if f.endswith('.pdf')]
 
-    # Tentar encontrar o PDF mais próximo usando fuzzy matching
-    nome_pdf_proximo, score = process.extractOne(nome_empresa, arquivos_pdf)
+    # Tentar extrair o CNPJ limpo (sem pontos, barras ou traços) do nome da empresa
+    cnpj = re.search(r'(\d{14})', nome_empresa)
+    
+    if cnpj:
+        cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
+        print(f"🔍 Buscando pelo CNPJ: {cnpj}")
+        
+        # Buscar diretamente o PDF com base no CNPJ limpo
+        nome_pdf_proximo = None
+        for arquivo in arquivos_pdf:
+            if cnpj in arquivo:  # Verifica se o CNPJ está no nome do arquivo PDF
+                nome_pdf_proximo = arquivo
+                break
 
-    if score >= 80:  # Define um limite mínimo de similaridade (ajustável)
-        caminho_pdf = os.path.join(pasta_debitos, nome_pdf_proximo)
-        print(f"🔍 PDF encontrado: {nome_pdf_proximo} (Similaridade: {score}%)")
+        if nome_pdf_proximo:
+            caminho_pdf = os.path.join(pasta_debitos, nome_pdf_proximo)
+            print(f"🔍 PDF encontrado: {nome_pdf_proximo}")
 
-        # Aqui você pode usar uma biblioteca para abrir o PDF, por exemplo, pdfplumber
-        abrir_pdf(caminho_pdf, numeros_procurados, nome_empresa)
+            # Aqui você pode usar uma biblioteca para abrir o PDF, por exemplo, pdfplumber
+            abrir_pdf(caminho_pdf, numeros_procurados, nome_empresa)
+        else:
+            print(f"⚠️ Nenhum PDF encontrado para o CNPJ '{cnpj}'.")
     else:
-        print(f"⚠️ Nenhum PDF encontrado para a empresa '{nome_empresa}'.")
+        print(f"⚠️ CNPJ não encontrado no nome da empresa '{nome_empresa}'.")
 
 #busca os numeros de dividas ativas aqui
 
@@ -172,17 +185,30 @@ def consultar_pdf_da_empresa_codigos(nome_empresa, numeros_procurados):
     # Listar todos os arquivos PDF na pasta
     arquivos_pdf = [f for f in os.listdir(pasta_debitos) if f.endswith('.pdf')]
 
-    # Tentar encontrar o PDF mais próximo usando fuzzy matching
-    nome_pdf_proximo, score = process.extractOne(nome_empresa, arquivos_pdf)
+    # Tentar extrair o CNPJ limpo (sem pontos, barras ou traços) do nome da empresa
+    cnpj = re.search(r'(\d{14})', nome_empresa)
+    
+    if cnpj:
+        cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
+        print(f"🔍 Buscando pelo CNPJ: {cnpj}")
+        
+        # Buscar diretamente o PDF com base no CNPJ limpo
+        nome_pdf_proximo = None
+        for arquivo in arquivos_pdf:
+            if cnpj in arquivo:  # Verifica se o CNPJ está no nome do arquivo PDF
+                nome_pdf_proximo = arquivo
+                break
 
-    if score >= 80:  # Define um limite mínimo de similaridade
-        caminho_pdf = os.path.join(pasta_debitos, nome_pdf_proximo)
-        print(f"🔍 PDF encontrado: {nome_pdf_proximo} (Similaridade: {score}%)")
+        if nome_pdf_proximo:
+            caminho_pdf = os.path.join(pasta_debitos, nome_pdf_proximo)
+            print(f"🔍 PDF encontrado: {nome_pdf_proximo}")
 
-        # Chamar a função para processar o PDF
-        abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa)
+            # Chamar a função para processar o PDF
+            abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa)
+        else:
+            print(f"⚠️ Nenhum PDF encontrado para o CNPJ '{cnpj}'.")
     else:
-        print(f"⚠️ Nenhum PDF encontrado para a empresa '{nome_empresa}'.")
+        print(f"⚠️ CNPJ não encontrado no nome da empresa '{nome_empresa}'.")
 
 def abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa):
     """
@@ -391,7 +417,7 @@ def login():
     )
     baixar_popup.click()
 
-    sleep(6)
+    sleep(8)
     pyautogui.press('F5')
     sleep(2)
 
@@ -432,38 +458,33 @@ def login():
     # Lista para armazenar os dados das empresas
     dados_cnpjs = []
 
-    # Encontrar todas as linhas de empresas
-    linhas_empresas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "tr.clickable")))
 
-    # Iterar sobre cada linha de empresa
-    for linha in linhas_empresas:
-        # Dentro de cada linha, buscar o nome da empresa
-        nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
-        print(f"Nome da empresa: {nome_empresa}")
-        
-        # Pegar o CNPJ que está na segunda coluna
-        cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
-        cnpj = cnpj.replace('.', '').replace('/', '')
-        print(f"CNPJ: {cnpj}")
-        
-        # Adicionar os dados à lista
-        dados_cnpjs.append([nome_empresa, cnpj])
+    # Encontrar todas as linhas da tabela
+    linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
+    print("Numero de linhas:",len(linhas))
 
-        # Criar o DataFrame a partir da lista de dados
-        df_cnpjs = pd.DataFrame(dados_cnpjs, columns=['Nome da Empresa', 'CNPJ'])
+    for linha in linhas:
+        try:
+            print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
+            # Extrair o CNPJ
+            cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
+            cnpj = re.sub(r'[^0-9]', '', cnpj)
+            # Extrair o Nome da Empresa
+            nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
 
-        # Salvar o DataFrame no arquivo Excel
-        df_cnpjs.to_excel(caminho_excel_cnpjs, index=False)
+            print(f"Empresa: {nome_empresa} | CNPJ: {cnpj}")
 
-        print(f"Arquivo Excel salvo em: {caminho_excel_cnpjs}")
+            # Encontrar e clicar na lupa correspondente
+            lupa = linha.find_element(By.XPATH, ".//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]")
+            
+            # Usar JavaScript para garantir o clique, caso necessário
+            driver.execute_script("arguments[0].click();", lupa)
 
-        lupas = WebDriverWait(driver,5).until(
-            EC.presence_of_all_elements_located((By.XPATH,"//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]"))
-        )
-        
-        for lupa in lupas:
-            WebDriverWait(driver, 5).until(EC.element_to_be_clickable(lupa)).click()
-
+            # Aguarde o carregamento da nova informação, se houver
+            WebDriverWait(driver, 5).until(EC.staleness_of(lupa))  # Espera a lupa desaparecer/mudar
+        except Exception as e:
+            print(f"Erro ao processar uma linha: {e}")
 
             #tentando clicar em dívidas ativas
             try: 
@@ -528,8 +549,8 @@ def login():
         sleep(3)
         pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
-        sleep(2)
-        driver.quit()
+    sleep(2)
+    driver.quit()
 
 from PIL import Image, ImageTk
 

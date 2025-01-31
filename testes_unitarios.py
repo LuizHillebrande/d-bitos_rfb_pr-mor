@@ -1,43 +1,16 @@
-import os
-import re
+from fuzzywuzzy import fuzz
 
-def extrair_nome_empresa_e_cnpj(nome_arquivo):
-    """
-    Extrai o nome da empresa e o CNPJ do nome do arquivo PDF.
-    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Arquivo.pdf'.
-    """
-    # Expressão regular para capturar o CNPJ
-    cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
-    if cnpj:
-        cnpj = cnpj.group(1)  # Extrai o CNPJ
+def comparar_empresas(nome_empresa1, nome_empresa2):
+    # Calcula a similaridade entre as duas empresas usando fuzzywuzzy
+    similaridade = fuzz.ratio(nome_empresa1, nome_empresa2)
 
-    # Remove o prefixo 'situacao_fiscal--CNPJ-' e qualquer código no final
-    nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
-    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
-    
-    return nome_limpo.strip(), cnpj
+    # Retorna o valor de similaridade
+    return similaridade
 
-def renomear_pdfs_com_cnpj(pasta):
-    """
-    Itera sobre todos os PDFs da pasta e renomeia, usando o CNPJ como ID único.
-    """
-    for arquivo in os.listdir(pasta):
-        if arquivo.endswith(".pdf"):
-            caminho_antigo = os.path.join(pasta, arquivo)
-            nome_empresa, cnpj = extrair_nome_empresa_e_cnpj(arquivo)
-            
-            # Criar o novo nome do arquivo com CNPJ
-            if cnpj:
-                novo_nome = f"{cnpj}_{nome_empresa}.pdf"
-                caminho_novo = os.path.join(pasta, novo_nome)
-                
-                # Renomeia o arquivo
-                os.rename(caminho_antigo, caminho_novo)
-                print(f"Renomeado: {arquivo} → {novo_nome}")
-            else:
-                print(f"Não foi possível extrair o CNPJ de: {arquivo}")
+# Testando a função
+nome_empresa1 = "07611951000146_Silva E Lima Moveis Ltda"
+nome_empresa2 = "07611951000227_Silva & Lima Moveis Ltda"
 
-# Defina a pasta onde estão os PDFs
-pasta_pdfs = "debitos"
+similaridade = comparar_empresas(nome_empresa1, nome_empresa2)
+print(f"A similaridade entre as duas empresas é: {similaridade}%")
 
-renomear_pdfs_com_cnpj(pasta_pdfs)
