@@ -105,9 +105,43 @@ def pressionar_ate_encontrar(imagem, intervalo=0.5):
             pyautogui.press('down')
             time.sleep(intervalo)
 
+def extrair_cnpj_nome_empresa(driver):
+    try:
+        # Localiza o elemento que contém o CNPJ e nome da empresa
+        dados_perfil = driver.find_element(By.XPATH, "//span[@class='dados-perfil']")
+        
+        # Extrai o texto
+        texto = dados_perfil.text.strip()
+        
+        # Remove o prefixo "Empregador: " caso exista
+        if texto.startswith("Empregador: "):
+            texto = texto.replace("Empregador: ", "")
+        
+        # Verifica se o formato está correto (deve conter ' | ')
+        if ' | ' in texto:
+            cnpj, nome_empresa = texto.split(' | ')
+            
+            # Limpa o CNPJ (remove pontuação, se necessário)
+            cnpj_limpo = cnpj.replace('.', '').replace('-', '').replace('/', '')
+            
+            # Formata o nome da empresa
+            nome_empresa_formatado = nome_empresa.strip()
+            
+            # Cria a string no formato desejado
+            resultado = f"{cnpj_limpo}_{nome_empresa_formatado}"
+            
+            return resultado
+        else:
+            print(f"Formato inesperado do texto extraído: {texto}")
+            return None
+    
+    except Exception as e:
+        print(f"Erro ao extrair CNPJ e nome da empresa: {e}")
+        return None
+
+
+
 def pegar_debitos_fgts():
-
-
     mes_atual = datetime.now().strftime("%m-%Y")
 
     # Caminho para o diretório de downloads
@@ -162,11 +196,10 @@ def pegar_debitos_fgts():
     definir.click()
     print('Clicado em definir')
 
+
     for linha in sheet_wb.iter_rows(min_row=2, max_row=500):
-        razao_social = linha[1].value
         cnpj = linha[2].value
 
-        
         from selenium.common.exceptions import StaleElementReferenceException
 
         try:
@@ -206,6 +239,15 @@ def pegar_debitos_fgts():
         )
         selecionar.click()
         sleep(1)
+
+        resultado_cnpj_nome = extrair_cnpj_nome_empresa(driver)
+    
+        if resultado_cnpj_nome:
+            print(f"Resultado extraído: {resultado_cnpj_nome}")
+        else:
+            print("Não foi possível extrair o CNPJ e nome da empresa.")
+        
+        razao_social = resultado_cnpj_nome
 
         consultas_empregador = WebDriverWait(driver,5).until(
             EC.element_to_be_clickable((By.XPATH,"//div[contains(@class, 'amplo cardListItem')]//span[contains(text(), 'Consultas do Empregador')]"))

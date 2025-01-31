@@ -202,5 +202,50 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
 
 # Chamada da função
+import pandas as pd
+
+def criar_msg_fgts():
+    # Carregar os arquivos
+    fgts_df = pd.read_excel("debitos_fgts.xlsx")
+    mensagens_df = pd.read_excel("mensagens.xlsx")
+
+    # Criar um dicionário para agrupar os débitos por empresa
+    fgts_dict = {}
+    for _, row in fgts_df.iterrows():
+        nome_completo = row["Nome da Empresa"]
+        cnpj, nome_empresa = nome_completo.split("_", 1)
+        mes_ref = row["Mês Ref."]
+        valor = row["Valor Débitos"]
+        
+        if cnpj not in fgts_dict:
+            fgts_dict[cnpj] = {"nome": nome_empresa, "debitos": {}}
+        
+        if mes_ref not in fgts_dict[cnpj]["debitos"]:
+            fgts_dict[cnpj]["debitos"][mes_ref] = 0
+        
+        fgts_dict[cnpj]["debitos"][mes_ref] += valor
+
+    # Criar ou atualizar as mensagens
+    for cnpj, data in fgts_dict.items():
+        nome_empresa = data["nome"]
+        debitos_texto = ", ".join([f"{mes}: R$ {valor:.2f}" for mes, valor in data["debitos"].items()])
+        
+        if cnpj in mensagens_df["Empresa"].astype(str).values:
+            print('tinha o cnpj', cnpj)
+            mensagem_fgts = f"{nome_empresa}, você também possui débitos de FGTS: " + ", ".join(
+                [f"{mes} no valor de R$ {valor:.2f}" for mes, valor in data['debitos'].items()]
+            ) + "."
+            mensagens_df.loc[mensagens_df["Empresa"].astype(str) == cnpj, "Mensagem"] += f" {mensagem_fgts}"
+        else:
+            mensagem = f"{nome_empresa}, segue resumo dos seus débitos de FGTS: {debitos_texto}."
+            mensagens_df = pd.concat([mensagens_df, pd.DataFrame({"Empresa": [cnpj], "Mensagem": [mensagem]})], ignore_index=True)
+
+    # Salvar o arquivo atualizado
+    mensagens_df.to_excel("mensagens.xlsx", index=False)
+
+    print("Mensagens de FGTS geradas e salvas com sucesso!")
+
+
 criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
 criar_msgs(caminho_saida="mensagens.xlsx")
+criar_msg_fgts()
