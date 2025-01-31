@@ -72,10 +72,20 @@ def localizar_imagem_na_tela(imagem, confidence=0.8):
     try:
         # Localiza a imagem na tela
         localizacao = pyautogui.locateOnScreen(imagem, confidence=confidence)
-        return localizacao
+        
+        if localizacao:
+            # Move o mouse para as coordenadas do centro da imagem
+            pyautogui.moveTo(pyautogui.center(localizacao))
+            sleep(1)
+            pyautogui.click()
+            return localizacao
+        else:
+            print("Imagem não encontrada.")
+            return None
     except Exception as e:
         print(f"Erro ao localizar imagem: {e}")
         return None
+
 
 def pressionar_ate_encontrar(imagem, intervalo=0.5):
     """
