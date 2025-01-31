@@ -18,21 +18,32 @@ def salvar_mensagem(df_existente, nome_empresa, nova_mensagem, caminho_saida):
     # Lista de empresas já existentes no arquivo
     nomes_existentes = df_existente['Empresa'].tolist()
 
+    # Mostrar os nomes das empresas existentes no DataFrame
+    print("Empresas existentes no arquivo:", nomes_existentes)
+
     # Encontrar o nome mais parecido
     nome_mais_proximo, score = process.extractOne(nome_empresa, nomes_existentes) if nomes_existentes else (None, 0)
+
+    # Mostrar o nome mais próximo e o score
+    print(f"Procurando pelo nome: {nome_empresa}")
+    print(f"Nome mais próximo encontrado: {nome_mais_proximo}, Score: {score}")
 
     # Se encontrou uma correspondência confiável, usa o nome existente
     if nome_mais_proximo and score >= 80:
         nome_empresa = nome_mais_proximo
+        print(f"Usando nome mais próximo: {nome_empresa}")
 
     # Se a empresa já existir no arquivo, concatena a mensagem
     if nome_empresa in df_existente['Empresa'].values:
+        print(f"Empresa '{nome_empresa}' encontrada no arquivo, concatenando mensagem...")
         df_existente.loc[df_existente['Empresa'] == nome_empresa, 'Mensagem'] += f"\n{nova_mensagem}"
     else:
+        print(f"Empresa '{nome_empresa}' não encontrada no arquivo, criando nova linha...")
         nova_linha = pd.DataFrame({"Empresa": [nome_empresa], "Mensagem": [nova_mensagem]})
         df_existente = pd.concat([df_existente, nova_linha], ignore_index=True)
 
     return df_existente
+
 
 
 import os
