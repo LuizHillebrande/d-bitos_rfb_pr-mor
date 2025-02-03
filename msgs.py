@@ -3,6 +3,7 @@ import pandas as pd
 import re
 from fuzzywuzzy import process
 from datetime import datetime
+import textwrap
 
 # Caminho para a pasta "resultados"
 diretorio_resultados = os.path.join(os.getcwd(), 'resultados')
@@ -85,10 +86,10 @@ def criar_msgs(caminho_saida):
                     situacoes = df.groupby('SITUAÇÃO')['NUMERO DO PROCESSO'].apply(list).to_dict()
                     
                     # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
-                    mensagem = f"{nome_empresa_sem_cnpj}, com base em consulta no dia {data_atual}, \n"
+                    mensagem = f"A empresa possui os seguintes débitos referente a parcelamentos: \n"
                     for situacao, processos in situacoes.items():
                         processos_formatados = ', '.join(processos)  # Junta os números dos processos
-                        mensagem += f"Você tem os processos {processos_formatados} em '{situacao}'.\n"
+                        mensagem += f"{situacao}'.\n"
 
                     df_existente = salvar_mensagem(df_existente, cnpj, mensagem.strip(), caminho_saida)
                     
@@ -141,7 +142,14 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                     # Agrupando os dados pelo PA - Exercício
                     meses_agrupados = df.groupby('PA - Exercício')
 
-                    mensagem = f"Olá {nome_empresa_sem_cnpj},\nSegue o resumo dos seus débitos consultados no dia {data_atual}:\n\n"
+                    mensagem = f"Olá {nome_empresa_sem_cnpj},\n"
+                    mensagem += "Identificamos que sua empresa possui algumas pendências em aberto junto à Receita Federal.\n"
+                    mensagem += "Essas pendências podem gerar multas, juros e complicações mais sérias se não forem regularizadas em tempo hábil.\n\n"
+                    mensagem += "Segue o resumo dos seus débitos:\n\n"
+                    mensagem = textwrap.dedent(mensagem)
+
+
+
 
                     for pa_exercicio, grupo in meses_agrupados:
                         mensagem += f"**Referente a {pa_exercicio}:**\n"
@@ -246,6 +254,32 @@ def criar_msg_fgts():
     print("Mensagens de FGTS geradas e salvas com sucesso!")
 
 
+def criar_msg_final():
+    # Carregar o arquivo de mensagens
+    mensagens_df = pd.read_excel("mensagens.xlsx")
+
+    # Definir a mensagem final
+    data_atual = datetime.now().strftime("%d/%m/%y")
+    mensagem_final = (
+        f"\nOs valores informados são válidos na data de envio deste e-mail ({data_atual}) e podem sofrer alterações.\n"
+        "Caso tenha interesse em regularizar essas pendências, entre em contato com o nosso time "
+        "para mais detalhes e orientações sobre os próximos passos.\n"
+        "Ficamos à disposição para qualquer dúvida ou informação adicional!\n\n"
+        "Atenciosamente,\n"
+        "Prímor Contábil\n"
+        "(44) 98462-9927 / atendimento@contabilprimor.com.br"
+    )
+
+    # Garantir que a mensagem final seja a última coisa adicionada a cada linha
+    mensagens_df["Mensagem"] = mensagens_df["Mensagem"].astype(str) + mensagem_final
+
+    # Salvar as mensagens atualizadas
+    mensagens_df.to_excel("mensagens.xlsx", index=False)
+
+    print("Mensagem final adicionada com sucesso!")
+
+
 criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
 criar_msgs(caminho_saida="mensagens.xlsx")
 criar_msg_fgts()
+criar_msg_final()
