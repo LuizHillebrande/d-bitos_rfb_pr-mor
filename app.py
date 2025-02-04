@@ -325,28 +325,38 @@ def salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pas
     
     print(f"Arquivo salvo em {caminho_arquivo}")
 
-def descompactar_arquivo_zip(download_folder):
-    # Descompactar o arquivo ZIP
+def descompactar_arquivo_zip(download_folder, driver):
     zip_file = None
-    for file in os.listdir(download_folder):
-        if file.endswith('.zip'):
-            zip_file_path = os.path.join(download_folder, file)
-            if not zip_file or os.path.getmtime(zip_file_path) > os.path.getmtime(zip_file):
-                zip_file = zip_file_path
 
-    if zip_file:
-        try:
-            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-                zip_ref.extractall(download_folder)
-            print(f"Arquivo ZIP {zip_file} descompactado.")
+    while not zip_file:
+        # Verifica se há um arquivo ZIP na pasta
+        for file in os.listdir(download_folder):
+            if file.endswith('.zip'):
+                zip_file = os.path.join(download_folder, file)
+                break  # Sai do loop assim que encontrar o primeiro ZIP
 
-            # Excluir o arquivo ZIP
-            os.remove(zip_file)
-            print(f"Arquivo ZIP {zip_file} excluído.")
-        except Exception as e:
-            print(f"Erro ao descompactar ou excluir o arquivo ZIP: {e}")
-    else:
-        print("Nenhum arquivo ZIP encontrado na pasta 'debitos'.")
+        if not zip_file:
+            pyautogui.press('f5')
+            sleep(2)
+            baixar_nuvem = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, "//a[contains(@id, '__BV_toggle_') and contains(@class, 'nav-link dropdown-toggle')]"))
+            )
+            baixar_nuvem.click()
+            print("Nenhum arquivo ZIP encontrado. Tentando novamente em 5 segundos...")
+            pyautogui.click(667, 300, duration=1)  # Clica no botão
+            time.sleep(10)  # Espera 10 segundos antes de tentar novamente
+
+    # Se encontrou um ZIP, descompacta
+    try:
+        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+            zip_ref.extractall(download_folder)
+        print(f"Arquivo ZIP {zip_file} descompactado.")
+
+        # Excluir o arquivo ZIP
+        os.remove(zip_file)
+        print(f"Arquivo ZIP {zip_file} excluído.")
+    except Exception as e:
+        print(f"Erro ao descompactar ou excluir o arquivo ZIP: {e}")
 
 # Caminho da pasta onde os PDFs foram descompactados
 pasta_debitos = os.path.join(os.getcwd(), 'debitos')
@@ -430,10 +440,11 @@ def login():
 
 
     # Localiza o botão com a classe e o texto "Sim"
-    button = driver.find_element(By.XPATH, "//button[contains(@class, 'mb-50') and text()='Sim']")
-    print(button)
+    #button = driver.find_element(By.XPATH, "//button[contains(@class, 'mb-50') and text()='Sim']")
+    #print(button)
     # Clica no botão
     #button.click()
+    sleep(5)
 
     filtro_irregulares = WebDriverWait(driver, 5).until(
     EC.element_to_be_clickable((By.XPATH, "//select[@name='filtroSelecao']"))
@@ -452,10 +463,11 @@ def login():
             sleep(1)
             pyautogui.press('esc')
             break
-
+        
+    sleep(3)
 
     baixar_relatorios = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-outline-primary'] [1]"))
+        EC.element_to_be_clickable((By.XPATH,"//button[@title='O download será feito conforme os filtros atualmente selecionados'] [1]"))
     )
     baixar_relatorios.click()
 
@@ -469,7 +481,7 @@ def login():
     sleep(2)
 
     baixar_nuvem = WebDriverWait(driver, 5).until(
-        EC.element_to_be_clickable((By.XPATH, "//a[@class='nav-link dropdown-toggle' and @id='__BVID__197__BV_toggle_']"))
+        EC.element_to_be_clickable((By.XPATH, "//a[contains(@id, '__BV_toggle_') and contains(@class, 'nav-link dropdown-toggle')]"))
     )
     baixar_nuvem.click()
 
@@ -488,7 +500,7 @@ def login():
     pyautogui.click(667,300, duration = 1)
 
     sleep(5)
-    descompactar_arquivo_zip(download_folder)
+    descompactar_arquivo_zip(download_folder, driver)
     sleep(2)
     renomear_pdfs_com_cnpj(pasta_pdfs)
     pyautogui.press('Esc')
