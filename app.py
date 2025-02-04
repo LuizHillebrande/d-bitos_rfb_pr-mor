@@ -404,6 +404,37 @@ def login():
 
     sleep(2)
 
+    atualizar_lote = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-outline-primary'][1]"))
+    )
+
+    atualizar_lote.click()
+
+    sleep(2)
+
+    #aqui selecionar quais empresas devem ser atualizadas
+
+
+    vincular_todas = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-none btn-outline-success mt-1 mr-50 btn-sm']"))
+    )
+    vincular_todas.click()
+
+    sleep(1)
+
+    save = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-outline-success btn-none btn-none btn-sm']"))
+    )
+
+    save.click()
+
+
+    # Localiza o botão com a classe e o texto "Sim"
+    button = driver.find_element(By.XPATH, "//button[contains(@class, 'mb-50') and text()='Sim']")
+    print(button)
+    # Clica no botão
+    #button.click()
+
     filtro_irregulares = WebDriverWait(driver, 5).until(
     EC.element_to_be_clickable((By.XPATH, "//select[@name='filtroSelecao']"))
     )
@@ -421,55 +452,6 @@ def login():
             sleep(1)
             pyautogui.press('esc')
             break
-
-    atualizar_lote = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-outline-primary'][1]"))
-    )
-
-    atualizar_lote.click()
-
-    sleep(2)
-
-    #aqui selecionar quais empresas devem ser atualizadas
-
-    filtro_irregulares = WebDriverWait(driver, 5).until(
-    EC.element_to_be_clickable((By.XPATH, "//select[@name='filtroSelecao']"))
-    )
-
-    # Abre a lista de opções do select
-    driver.execute_script("arguments[0].click();", filtro_irregulares)
-    sleep(2)
-
-    # Seleciona a opção que contém "Irregulares"
-    select = Select(filtro_irregulares)
-
-    # Aqui vamos selecionar a opção "Irregulares"
-    for option in select.options:
-        if "Irregulares" in option.text:
-            option.click()
-            print('cliquei em irregulares')
-            sleep(1)
-            break
-
-    vincular_todas = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-none btn-outline-success mt-1 mr-50 btn-sm']"))
-    )
-    vincular_todas.click()
-
-    sleep(1)
-
-    save = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-outline-success btn-none btn-none btn-sm']"))
-    )
-
-    save.click()
-
-
-    # Localiza o botão com a classe e o texto "Sim"
-    button = driver.find_element(By.XPATH, "//button[contains(@class, 'p-60') and contains(@class, 'btn') and contains(@class, 'btn-outline-primary') and contains(@class, 'mb-50') and text()='Sim']")
-    print(button)
-    # Clica no botão
-    #button.click()
 
 
     baixar_relatorios = WebDriverWait(driver,5).until(
@@ -656,6 +638,40 @@ def atualizar_informacoes(frame):
     )
     info_atualizada.pack(pady=5)
 
+import customtkinter as ctk
+from tkinter import messagebox
+from datetime import datetime
+import schedule
+import time
+import threading
+
+
+# Função para configurar o horário
+def agendar_robo():
+    horario = horario_entry.get()  # Pegando o valor do campo de entrada
+    try:
+        # Validar o formato de hora
+        horario_formatado = datetime.strptime(horario, "%H:%M")
+        
+        # Agendar a execução do login para o horário escolhido
+        horario_str = horario_formatado.strftime("%H:%M")
+        schedule.every().day.at(horario_str).do(login)  # Executa a função login todos os dias nesse horário
+
+        messagebox.showinfo("Horário agendado", f"O robô será executado às {horario_formatado.strftime('%H:%M')}")
+        
+        # Iniciar o agendamento em uma thread separada para não bloquear a interface
+        threading.Thread(target=run_schedule).start()
+
+    except ValueError:
+        messagebox.showerror("Erro", "Formato de hora inválido! Use o formato HH:MM.")
+
+# Função para rodar o schedule em uma thread separada
+def run_schedule():
+    while True:
+        schedule.run_pending()  # Verifica se alguma tarefa agendada precisa ser executada
+        time.sleep(1)  # Espera 1 segundo antes de verificar novamente
+
+
 # Configuração inicial da interface
 ctk.set_appearance_mode("dark")  # "System", "Light" ou "Dark"
 ctk.set_default_color_theme("blue")  # "blue", "green" ou "dark-blue"
@@ -698,8 +714,29 @@ main_label = ctk.CTkLabel(
 )
 main_label.pack(pady=20)
 
+# Seleção de horário
+horario_label = ctk.CTkLabel(
+    app, text="Escolha o horário para o robô rodar (formato HH:MM):", font=("Arial", 16)
+)
+horario_label.pack(pady=10)
+
+# Campo de entrada para o horário
+horario_entry = ctk.CTkEntry(app, width=150, font=("Arial", 14))
+horario_entry.insert(0, "09:00")  # Definir o horário padrão
+horario_entry.pack(pady=10)
+
+# Botão para agendar
+agendar_button = ctk.CTkButton(
+    main_frame,
+    text="Agendar Robô",
+    command=agendar_robo,
+    font=("Arial", 16, "bold"),
+)
+agendar_button.pack(pady=10)
+
 # Adicionar imagens e mensagem de parceria
 try:
+    from PIL import Image, ImageTk  # Certifique-se de que o Pillow está instalado
     primor_image = ImageTk.PhotoImage(Image.open("imgs/primor.png").resize((200, 120)))
     luiz_image = ImageTk.PhotoImage(Image.open("imgs/luiz.png").resize((200, 120)))
 
@@ -729,7 +766,7 @@ info_frame = ctk.CTkFrame(main_frame, height=200)
 info_frame.pack(fill="both", expand=True, padx=10, pady=(10, 20))
 
 # Atualizar as informações no frame (exemplo)
-atualizar_informacoes(info_frame)
+# atualizar_informacoes(info_frame)  # Descomente se necessário
 
 # Footer (centralizado)
 footer_frame = ctk.CTkFrame(app, height=50, corner_radius=0)
