@@ -19,6 +19,7 @@ import zipfile
 import os
 import shutil
 from thefuzz import process 
+from selenium.webdriver.common.by import By
 
 
 
@@ -384,12 +385,12 @@ def login():
     logar_email = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//input[@id='email']"))
     )
-    logar_email.send_keys('luiz.logika@gmail.com')
+    logar_email.send_keys('taina@contabilprimor.com.br')
 
     logar_senha = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//input[@id='senhaInput']"))
     )
-    logar_senha.send_keys('Luiz123')
+    logar_senha.send_keys('Primor1214')
 
     logar = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@type='submit']"))
@@ -401,14 +402,78 @@ def login():
 
     driver.get("https://app.monitorcontabil.com.br/situacao-fiscal/visualizar?busca=")
 
-    #atualizar_lote = WebDriverWait(driver,5).until(
-        #EC.element_to_be_clickable((By.XPATH,"//button[@title='A atualização busca a Situação fiscal na data atual para todas as empresas selecionadas. #Cada atualização consumirá um crédito do saldo em conta.']"))
-    #)
+    sleep(2)
 
-    #atualizar_lote.click()
+    filtro_irregulares = WebDriverWait(driver, 5).until(
+    EC.element_to_be_clickable((By.XPATH, "//select[@name='filtroSelecao']"))
+    )
+
+    # Abre a lista de opções do select
+    filtro_irregulares.click()
+
+    # Seleciona a opção que contém "Irregulares - 153"
+    select = Select(filtro_irregulares)
+
+    # Aqui vamos selecionar a opção "Irregulares"
+    for option in select.options:
+        if "Irregulares" in option.text:
+            option.click()
+            sleep(1)
+            pyautogui.press('esc')
+            break
+
+    atualizar_lote = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-outline-primary'][1]"))
+    )
+
+    atualizar_lote.click()
+
+    sleep(2)
+
+    #aqui selecionar quais empresas devem ser atualizadas
+
+    filtro_irregulares = WebDriverWait(driver, 5).until(
+    EC.element_to_be_clickable((By.XPATH, "//select[@name='filtroSelecao']"))
+    )
+
+    # Abre a lista de opções do select
+    driver.execute_script("arguments[0].click();", filtro_irregulares)
+    sleep(2)
+
+    # Seleciona a opção que contém "Irregulares"
+    select = Select(filtro_irregulares)
+
+    # Aqui vamos selecionar a opção "Irregulares"
+    for option in select.options:
+        if "Irregulares" in option.text:
+            option.click()
+            print('cliquei em irregulares')
+            sleep(1)
+            break
+
+    vincular_todas = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-none btn-outline-success mt-1 mr-50 btn-sm']"))
+    )
+    vincular_todas.click()
+
+    sleep(1)
+
+    save = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-outline-success btn-none btn-none btn-sm']"))
+    )
+
+    save.click()
+
+
+    # Localiza o botão com a classe e o texto "Sim"
+    button = driver.find_element(By.XPATH, "//button[contains(@class, 'p-60') and contains(@class, 'btn') and contains(@class, 'btn-outline-primary') and contains(@class, 'mb-50') and text()='Sim']")
+    print(button)
+    # Clica no botão
+    #button.click()
+
 
     baixar_relatorios = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@title='O download será feito conforme os filtros atualmente selecionados']"))
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-outline-primary'] [1]"))
     )
     baixar_relatorios.click()
 
@@ -464,7 +529,9 @@ def login():
     linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
     print("Numero de linhas:",len(linhas))
 
-    for linha in linhas:
+    start = len(linhas) - 2  # Iniciar no penúltimo elemento
+    for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
+        print(f'Processando linha {i + 1} de {len(linhas)}')
         try:
             print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
             # Extrair o CNPJ
@@ -544,6 +611,16 @@ def login():
 
             pyautogui.press('esc')
             sleep(2)
+
+            if i + 1 == len(linhas):
+                try:
+                    pula_pagina = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//button[@role='menuitem']"))
+                    )
+                    pula_pagina.click()
+                    print("Avançando para a próxima página...")
+                except Exception as e:
+                    print(f"Erro ao clicar no botão de avançar página: {e}")
 
 
         sleep(3)
