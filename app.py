@@ -657,7 +657,27 @@ def carregar_codigos_fiscais(caminho_arquivo_excel):
     
     return codigos_fiscais
 
+import shutil
+
+def limpar_pastas():
+    pastas = ['debitos', 'resultados', 'resultados_codigos', 'codigos fiscais', 'dividas ativas']
+    
+    for pasta in pastas:
+        if os.path.exists(pasta):
+            for arquivo in os.listdir(pasta):
+                caminho_arquivo = os.path.join(pasta, arquivo)
+                if os.path.isfile(caminho_arquivo) or os.path.islink(caminho_arquivo):
+                    os.unlink(caminho_arquivo)  # Remove arquivos e links simbólicos
+                elif os.path.isdir(caminho_arquivo):
+                    shutil.rmtree(caminho_arquivo)  # Remove subpastas
+            print(f"Conteúdo da pasta '{pasta}' foi excluído.")
+        else:
+            print(f"A pasta '{pasta}' não existe.")
+
+
+
 def login():
+    limpar_pastas()
     download_folder = os.path.join(os.getcwd(), 'debitos')
 
     # Configuração para o Chrome salvar os PDFs diretamente na pasta especificada
@@ -775,8 +795,7 @@ def login():
     while True:
         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
 
-        start = len(linhas) - 2  # Iniciar no penúltimo elemento
-        for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
+        for i, linha in enumerate(linhas):  # Define o início da iteração
             linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
             print("Numero de linhas:",len(linhas))
             print(f'Processando linha {i + 1} de {len(linhas)}')
@@ -800,6 +819,32 @@ def login():
                 WebDriverWait(driver, 5).until(EC.staleness_of(lupa))  # Espera a lupa desaparecer/mudar
             except Exception as e:
                 print(f"Erro ao processar uma linha: {e}")
+
+                #tentando clicar em débitos(sief)
+                try:    
+                    debitos_sief = WebDriverWait(driver,5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
+                    )
+                    debitos_sief.click()
+                    print('CLICADO EM DEBITOS SIEF')
+                    numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+                    lista_numeros = [numero.text for numero in numeros]
+
+                    print("Códigos fiscais:", lista_numeros, "\n")
+
+                    pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
+                    lista_pa_exercicio = [pa.text for pa in pa_exercicio]
+                    print("Pa - exercício = ", lista_pa_exercicio, "\n")
+
+                    nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
+                    pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+                    pasta_codigos = "codigos fiscais"
+                    salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
+                    processar_empresas_codigos()
+
+                except Exception as e:
+                    print('n cliquei em debitos sie F')
+                    print(f'Erro{e}')
 
                 #tentando clicar em dívidas ativas
                 try: 
@@ -831,31 +876,7 @@ def login():
                 except Exception as e:
                     print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
                 
-                #tentando clicar em débitos(sief)
-                try:    
-                    debitos_sief = WebDriverWait(driver,5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
-                    )
-                    debitos_sief.click()
-                    print('CLICADO EM DEBITOS SIEF')
-                    numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
-                    lista_numeros = [numero.text for numero in numeros]
-
-                    print("Códigos fiscais:", lista_numeros, "\n")
-
-                    pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
-                    lista_pa_exercicio = [pa.text for pa in pa_exercicio]
-                    print("Pa - exercício = ", lista_pa_exercicio, "\n")
-
-                    nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
-                    pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-                    pasta_codigos = "codigos fiscais"
-                    salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
-                    processar_empresas_codigos()
-
-                except Exception as e:
-                    print('n cliquei em debitos sie F')
-                    print(f'Erro{e}')
+                
 
                 pyautogui.press('esc')
                 sleep(2)
