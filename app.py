@@ -582,6 +582,26 @@ def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     df.to_excel(caminho_arquivo, index=False)
     print(f"Arquivo salvo em {caminho_arquivo}")
 
+import pandas as pd
+import os
+
+def salvar_processos_em_excel(lista_processos, nome_arquivo, pasta_destino, nome_empresa):
+    # Criar o DataFrame
+    df = pd.DataFrame(lista_processos, columns=["Processos SIEF"])
+
+    # Adicionar a coluna "Nome Empresa" na primeira posição
+    df.insert(0, "Nome Empresa", nome_empresa)  
+
+    # Criar caminho do arquivo
+    caminho_arquivo = os.path.join(pasta_destino, f"{nome_arquivo}.xlsx")
+    
+    # Salvar no Excel
+    df.to_excel(caminho_arquivo, index=False)
+    print(f"Arquivo salvo em {caminho_arquivo}")
+
+# Chamando a função corretamente
+
+
 #codigos fiscais salvando
 
 def salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos):
@@ -738,7 +758,7 @@ def login():
         
     sleep(3)
 
-    baixar_relatorios = WebDriverWait(driver,5).until(
+    baixar_relatorios = WebDriverWait(driver,15).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@title='O download será feito conforme os filtros atualmente selecionados'] [1]"))
     )
     baixar_relatorios.click()
@@ -777,6 +797,13 @@ def login():
     renomear_pdfs_com_cnpj(pasta_pdfs)
     pyautogui.press('Esc')
     sleep(2)
+
+    filtro_a_z = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH, "//th[contains(@class, 'vgt-left-align') and contains(@class, 'sortable')]/span[text()='Razão social']"))
+    )
+    filtro_a_z.click()
+    sleep(2)
+
 
     pasta_cnpjs = os.path.join(os.getcwd(), 'cnpj_empresas')
     if not os.path.exists(pasta_cnpjs):
@@ -868,6 +895,34 @@ def login():
                     salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
                     sleep(1)
                     processar_excel_e_abrir_pdf()
+                    #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
+                    #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
+                    #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
+                    #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
+
+                except Exception as e:
+                    print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
+
+                #tentando clicar em processo fiscal sief
+                try: 
+                    processo_sief = WebDriverWait(driver,2).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Processo Fiscal (Sief)']"))
+                    )
+                    processo_sief.click()
+
+                    # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
+                    processos = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+                    lista_processos = [processo.text for processo in processos]
+
+                    # Gerar nome do arquivo com CNPJ e nome da empresa
+                    nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
+
+                    pasta_destino_sief = "processos sief"
+                    if not os.path.exists(pasta_destino_sief):
+                        os.makedirs(pasta_destino_sief)
+                    
+                    salvar_processos_em_excel(lista_processos, nome_arquivo, pasta_destino_sief, nome_empresa)
+                    sleep(1)
                     #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
                     #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
                     #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)

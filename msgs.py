@@ -7,6 +7,7 @@ import textwrap
 
 # Caminho para a pasta "resultados"
 diretorio_resultados = os.path.join(os.getcwd(), 'resultados')
+diretorio_processos_sief = os.path.join(os.getcwd(), 'processos sief')
 # Caminhos para as pastas e arquivos
 diretorio_codigos = os.path.join(os.getcwd(), 'resultados_codigos')
 arquivo_tabelas = os.path.join(os.getcwd(), 'TABELASCDIGOSDERECEITA.xlsx')
@@ -70,10 +71,60 @@ def criar_msgs(caminho_saida):
             df = pd.read_excel(caminho_arquivo)
             
             # Garante que as colunas necessárias estão no DataFrame
+            if {'Nome Empresa', 'Processos SIEF'}.issubset(df.columns):
+                
+                # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "EMPRESA"
+                cnpj = re.search(r'(\d{14})', str(df['Nome Empresa'].iloc[0]))  # CNPJ esteja na primeira linha
+                if cnpj:
+                    cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
+                    
+                    # Remover o CNPJ do nome da empresa para utilizá-lo na mensagem
+                    nome_empresa_sem_cnpj = df['Nome Empresa'].iloc[0].replace(cnpj + "_", "")  # Remove o CNPJ do início do nome
+                    
+                    print(f"🔍 Buscando pelo CNPJ: {cnpj}")
+                    
+                    # Agrupa os processos pela mesma situação
+                    situacoes = df.groupby('PROCESSOS SIEF').apply(list).to_dict()
+                    
+                    # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
+                    mensagem = f"A empresa possui os seguintes débitos referente a Processos SIEF: \n"
+                    for situacao, processos in situacoes.items():
+                        processos_formatados = ', '.join(processos)  # Junta os números dos processos
+                        mensagem += f"{situacao}'.\n"
+
+                    df_existente = salvar_mensagem(df_existente, cnpj, mensagem.strip(), caminho_saida)
+                    
+                    print(f"Mensagem para {nome_empresa_sem_cnpj}:\n{mensagem}\n")
+                else:
+                    print(f"⚠️ CNPJ não encontrado para a empresa '{df['EMPRESA'].iloc[0]}'.")
+            else:
+                print(f"O arquivo {arquivo} não possui as colunas esperadas.")
+            
+        df_existente.to_excel(caminho_saida, index=False)
+        print("Mensagens salvas com sucesso!")
+
+def criar_msgs_processos_sief(caminho_saida):
+    data_atual = datetime.now().strftime("%d/%m/%y")
+    
+    # Percorre todos os arquivos Excel na pasta
+    for arquivo in os.listdir(diretorio_processos_sief):
+
+        if os.path.exists(caminho_saida):
+            df_existente = pd.read_excel(caminho_saida)
+        else:
+            df_existente = pd.DataFrame(columns=["Empresa", "Mensagem"])
+
+        if arquivo.endswith('.xlsx') or arquivo.endswith('.xls'):  # Verifica se é um arquivo Excel
+            caminho_arquivo = os.path.join(diretorio_processos_sief, arquivo)
+            
+            # Lê o arquivo Excel
+            df = pd.read_excel(caminho_arquivo)
+            
+            # Garante que as colunas necessárias estão no DataFrame
             if {'EMPRESA', 'DÍVIDA ATIVA', 'NUMERO DO PROCESSO', 'SITUAÇÃO'}.issubset(df.columns):
                 
                 # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "EMPRESA"
-                cnpj = re.search(r'(\d{14})', str(df['EMPRESA'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
+                cnpj = re.search(r'(\d{14})', str(df['EMPRESA'].iloc[0]))  # CNPJ esteja na primeira linha
                 if cnpj:
                     cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
                     
