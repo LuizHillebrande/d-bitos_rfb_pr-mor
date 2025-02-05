@@ -772,116 +772,113 @@ def login():
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "tr.clickable")))
 
     # Encontrar todas as linhas da tabela
-    linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
-    print("Numero de linhas:",len(linhas))
+    while True:
+        linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
 
-    start = len(linhas) - 2  # Iniciar no penúltimo elemento
-    for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
-        print(f'Processando linha {i + 1} de {len(linhas)}')
-        try:
-            print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
-            # Extrair o CNPJ
-            cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
-            cnpj = re.sub(r'[^0-9]', '', cnpj)
-            # Extrair o Nome da Empresa
-            nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
+        start = len(linhas) - 2  # Iniciar no penúltimo elemento
+        for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
+            linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
+            print("Numero de linhas:",len(linhas))
+            print(f'Processando linha {i + 1} de {len(linhas)}')
+            try:
+                print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
+                # Extrair o CNPJ
+                cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
+                cnpj = re.sub(r'[^0-9]', '', cnpj)
+                # Extrair o Nome da Empresa
+                nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
 
-            print(f"Empresa: {nome_empresa} | CNPJ: {cnpj}")
+                print(f"Empresa: {nome_empresa} | CNPJ: {cnpj}")
 
-            # Encontrar e clicar na lupa correspondente
-            lupa = linha.find_element(By.XPATH, ".//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]")
-            
-            # Usar JavaScript para garantir o clique, caso necessário
-            driver.execute_script("arguments[0].click();", lupa)
-
-            # Aguarde o carregamento da nova informação, se houver
-            WebDriverWait(driver, 5).until(EC.staleness_of(lupa))  # Espera a lupa desaparecer/mudar
-        except Exception as e:
-            print(f"Erro ao processar uma linha: {e}")
-
-            #tentando clicar em dívidas ativas
-            try: 
-                divida_ativa = WebDriverWait(driver,5).until(
-                    EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
-                )
-                divida_ativa.click()
-
-                # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
-                numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
-                lista_numeros = [numero.text for numero in numeros]
-
-    
-                # Gerar nome do arquivo com CNPJ e nome da empresa
-                nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
-
-                pasta_destino = "dividas ativas"
-                if not os.path.exists(pasta_destino):
-                    os.makedirs(pasta_destino)
+                # Encontrar e clicar na lupa correspondente
+                lupa = linha.find_element(By.XPATH, ".//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]")
                 
-                salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
-                sleep(1)
-                processar_excel_e_abrir_pdf()
-                #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
-                #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
-                #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
-                #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
+                # Usar JavaScript para garantir o clique, caso necessário
+                driver.execute_script("arguments[0].click();", lupa)
 
+                # Aguarde o carregamento da nova informação, se houver
+                WebDriverWait(driver, 5).until(EC.staleness_of(lupa))  # Espera a lupa desaparecer/mudar
             except Exception as e:
-                print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
-            
-            #tentando clicar em débitos(sief)
-            try:    
-                debitos_sief = WebDriverWait(driver,5).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
-                )
-                debitos_sief.click()
-                print('CLICADO EM DEBITOS SIEF')
-                numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
-                lista_numeros = [numero.text for numero in numeros]
+                print(f"Erro ao processar uma linha: {e}")
 
-                print("Códigos fiscais:", lista_numeros, "\n")
-
-                pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
-                lista_pa_exercicio = [pa.text for pa in pa_exercicio]
-                print("Pa - exercício = ", lista_pa_exercicio, "\n")
-
-                nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
-                pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-                pasta_codigos = "codigos fiscais"
-                salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
-                processar_empresas_codigos()
-
-            except Exception as i:
-                print('n cliquei em debitos sie F')
-                print(f'Erro{i}')
-
-            pyautogui.press('esc')
-            sleep(2)
-
-            criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
-            criar_msgs(caminho_saida="mensagens.xlsx")
-
-            print('Estamos na: ', i +1)
-            print('De: ', len(linhas))
-
-            if i + 1 == len(linhas):
-                try:
-                    pula_pagina = WebDriverWait(driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//button[@role='menuitem']"))
+                #tentando clicar em dívidas ativas
+                try: 
+                    divida_ativa = WebDriverWait(driver,5).until(
+                        EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
                     )
-                    pula_pagina.click()
-                    print("Avançando para a próxima página...")
+                    divida_ativa.click()
+
+                    # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
+                    numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+                    lista_numeros = [numero.text for numero in numeros]
+
+        
+                    # Gerar nome do arquivo com CNPJ e nome da empresa
+                    nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
+
+                    pasta_destino = "dividas ativas"
+                    if not os.path.exists(pasta_destino):
+                        os.makedirs(pasta_destino)
+                    
+                    salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino)
+                    sleep(1)
+                    processar_excel_e_abrir_pdf()
+                    #PEGAR os numeros da dívida, passar pra um excel, ai a partir disso ir no pdf e extrair
+                    #Todos que estiverem com ''Pendencia - inscrição'', situação ''Ativa em cobrança'' ou ''Ativa a ser cobrada'', precisa colocar pois são pendências em divida ativa que não foram negociadas ainda
+                    #Poderia colocar na mensagem algo como: Pendência em Inscrição em dívida ativa na Procuradoria-Geral da Fazenda Nacional:- colocar os números das inscrições e data que foi inscrito (obs: quando estiver parcelamento rescindido não aparecerá data da inscrição)
+                    #Os que estiverem em ''Inscrição com Exigibilidade Suspensa'' E ''Parcelamento com Exigibilidade Suspensa'' não precisa informar nada, pois as vidas já estão negociadas e parceladas
+
                 except Exception as e:
-                    print(f"Erro ao clicar no botão de avançar página: {e}")
+                    print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
+                
+                #tentando clicar em débitos(sief)
+                try:    
+                    debitos_sief = WebDriverWait(driver,5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Débito (Sief)']"))
+                    )
+                    debitos_sief.click()
+                    print('CLICADO EM DEBITOS SIEF')
+                    numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+                    lista_numeros = [numero.text for numero in numeros]
 
+                    print("Códigos fiscais:", lista_numeros, "\n")
 
-        sleep(3)
-        pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+                    pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
+                    lista_pa_exercicio = [pa.text for pa in pa_exercicio]
+                    print("Pa - exercício = ", lista_pa_exercicio, "\n")
 
-    sleep(2)
-    #criar_msg_fgts()
-    criar_msg_final()
-    driver.quit()
+                    nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
+                    pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+                    pasta_codigos = "codigos fiscais"
+                    salvar_codigos_em_excel(lista_numeros, lista_pa_exercicio, nome_arquivo, pasta_codigos)
+                    processar_empresas_codigos()
+
+                except Exception as e:
+                    print('n cliquei em debitos sie F')
+                    print(f'Erro{e}')
+
+                pyautogui.press('esc')
+                sleep(2)
+
+                criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
+                criar_msgs(caminho_saida="mensagens.xlsx")
+
+                if i + 1 == len(linhas):
+                    try:
+                        sleep(1)
+                        pula_pagina = WebDriverWait(driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Go to next page']"))
+                        )
+                        pula_pagina.click()
+                        print("Avançando para a próxima página...")
+                        linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
+                        print("Numero de linhas:",len(linhas))
+                    except Exception as e:
+                        print(f"Erro ao clicar no botão de avançar página: {e}")
+                        criar_msg_final()
+                        driver.quit()
+                        
+            pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
 from PIL import Image, ImageTk
 
