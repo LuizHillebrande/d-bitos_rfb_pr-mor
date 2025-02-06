@@ -116,7 +116,7 @@ def criar_msgs_processos_sief(caminho_saida, diretorio_processos_sief):
                     nome_empresa_sem_cnpj = "Nome não encontrado"
                 
                 # Gera a mensagem personalizada usando somente o CNPJ como identificador
-                mensagem = f"\nA empresa {nome_empresa_sem_cnpj} possui os seguintes débitos referentes a Processos SIEF:\n"
+                mensagem = f"\n\nA empresa {nome_empresa_sem_cnpj} possui os seguintes débitos referentes a Processos SIEF:\n\n"
                 mensagem += ', '.join(processos)
                 
                 # Salva ou concatena a mensagem no DataFrame existente, usando o CNPJ como chave
@@ -853,11 +853,11 @@ def login():
     pyautogui.press('Esc')
     sleep(2)
 
-    #filtro_a_z = WebDriverWait(driver,5).until(
-        #EC.element_to_be_clickable((By.XPATH, "//th[contains(@class, 'vgt-left-align') and contains(@class, 'sortable')]/span[text()='Razão social']"))
-    #)
-    #filtro_a_z.click()
-    #sleep(2)
+    filtro_a_z = WebDriverWait(driver,5).until(
+        EC.element_to_be_clickable((By.XPATH, "//th[contains(@class, 'vgt-left-align') and contains(@class, 'sortable')]/span[text()='Razão social']"))
+    )
+    filtro_a_z.click()
+    sleep(2)
 
 
     pasta_cnpjs = os.path.join(os.getcwd(), 'cnpj_empresas')
