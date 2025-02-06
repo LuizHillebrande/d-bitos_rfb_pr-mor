@@ -876,20 +876,23 @@ def login():
     # Encontrar todas as linhas da tabela
     while True:
         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
-
-        for i, linha in enumerate(linhas):  # Define o início da iteração
+        start = len(linhas) - 2 
+        for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
             linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
             print("Numero de linhas:",len(linhas))
             print(f'Processando linha {i + 1} de {len(linhas)}')
             try:
                 print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
+                print(f'🔎 HTML da linha:\n{linha.get_attribute("outerHTML")}\n')
                 # Extrair o CNPJ
-                cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
-                cnpj = re.sub(r'[^0-9]', '', cnpj)
-                # Extrair o Nome da Empresa
-                nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
+                cnpj_element = linha.find_element(By.XPATH, ".//td[contains(@class, 'col-tamanho-cnpj')]//span/span/span")
+                cnpj = re.sub(r'[^0-9]', '', cnpj_element.text)
 
-                print(f"Empresa: {nome_empresa} | CNPJ: {cnpj}")
+                # Encontrar o Nome da Empresa dentro da linha específica
+                nome_empresa_element = linha.find_element(By.XPATH, ".//td[contains(@class, 'vgt-left-align')]//span/span/span")
+                nome_empresa = nome_empresa_element.text
+
+                print(f"Empresaaa: {nome_empresa} | CNPJ: {cnpj}")
 
                 # Encontrar e clicar na lupa correspondente
                 lupa = linha.find_element(By.XPATH, ".//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]")
@@ -1000,19 +1003,22 @@ def login():
                             EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Go to next page']"))
                         )
                         pula_pagina.click()
+                        sleep(3)
                         print("Avançando para a próxima página...")
                         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
                         print("Numero de linhas:",len(linhas))
                     except Exception as e:
-                        print(f"Erro ao clicar no botão de avançar página: {e}")
+                        print("Processando mensagens finais...")
+                        criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida="mensagens.xlsx")
+                        criar_msgs(caminho_saida="mensagens.xlsx")
+                        criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief=diretorio_processos_sief)
                         criar_msg_final()
+                        print(f"Erro ao clicar no botão de avançar página: {e}")
                         driver.quit()
-                    
-            criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
-            criar_msgs(caminho_saida="mensagens.xlsx")
-            criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief = diretorio_processos_sief)
+        
+        
                         
-            pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+        pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
 from PIL import Image, ImageTk
 
