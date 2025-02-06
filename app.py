@@ -75,6 +75,61 @@ import pandas as pd
 from datetime import datetime
 import re
 
+diretorio_processos_sief = os.path.join(os.getcwd(), 'processos sief')
+
+def criar_msgs_processos_sief(caminho_saida, diretorio_processos_sief):
+    from datetime import datetime
+    import os
+    import pandas as pd
+
+    data_atual = datetime.now().strftime("%d/%m/%y")
+    
+    # Verifica se já existe um arquivo com mensagens e carrega os dados
+    if os.path.exists(caminho_saida):
+        df_existente = pd.read_excel(caminho_saida)
+    else:
+        df_existente = pd.DataFrame(columns=["Empresa", "Mensagem"])
+
+    # Percorre todos os arquivos Excel na pasta
+    for arquivo in os.listdir(diretorio_processos_sief):
+        if arquivo.endswith('.xlsx') or arquivo.endswith('.xls'):
+            # Exemplo do nome do arquivo: "23098061000139_C R V ESTERO E CIA LTDA.xlsx"
+            # Extrai o CNPJ que está antes do primeiro '_'
+            cnpj = arquivo.split('_')[0]
+            print(f"🔍 CNPJ extraído do nome do arquivo: {cnpj}")
+
+            # Monta o caminho completo do arquivo
+            caminho_arquivo = os.path.join(diretorio_processos_sief, arquivo)
+            
+            # Lê o arquivo Excel
+            df = pd.read_excel(caminho_arquivo)
+            
+            # Verifica se a coluna necessária existe
+            if 'Processos SIEF' in df.columns:
+                # Lista de processos (removendo valores vazios)
+                processos = df["Processos SIEF"].dropna().astype(str).tolist()
+
+                match = re.match(r'^\d+_(.*)\.xlsx$', arquivo)
+                if match:
+                    nome_empresa_sem_cnpj = match.group(1)
+                else:
+                    nome_empresa_sem_cnpj = "Nome não encontrado"
+                
+                # Gera a mensagem personalizada usando somente o CNPJ como identificador
+                mensagem = f"\nA empresa {nome_empresa_sem_cnpj} possui os seguintes débitos referentes a Processos SIEF:\n"
+                mensagem += ', '.join(processos)
+                
+                # Salva ou concatena a mensagem no DataFrame existente, usando o CNPJ como chave
+                df_existente = salvar_mensagem(df_existente, cnpj, mensagem.strip(), caminho_saida)
+                
+                print(f"✅ Mensagem gerada para {cnpj}:\n{mensagem}\n")
+            else:
+                print(f"⚠️ O arquivo {arquivo} não possui a coluna 'Processos SIEF' esperada.")
+
+    # Salva as mensagens geradas no arquivo Excel
+    df_existente.to_excel(caminho_saida, index=False)
+    print("✅ Mensagens salvas com sucesso!")
+
 def criar_msgs(caminho_saida):
     data_atual = datetime.now().strftime("%d/%m/%y")
     
@@ -680,7 +735,7 @@ def carregar_codigos_fiscais(caminho_arquivo_excel):
 import shutil
 
 def limpar_pastas():
-    pastas = ['debitos', 'resultados', 'resultados_codigos', 'codigos fiscais', 'dividas ativas']
+    pastas = ['debitos', 'resultados', 'resultados_codigos', 'codigos fiscais', 'dividas ativas', 'processos sief']
     
     for pasta in pastas:
         if os.path.exists(pasta):
@@ -798,11 +853,11 @@ def login():
     pyautogui.press('Esc')
     sleep(2)
 
-    filtro_a_z = WebDriverWait(driver,5).until(
-        EC.element_to_be_clickable((By.XPATH, "//th[contains(@class, 'vgt-left-align') and contains(@class, 'sortable')]/span[text()='Razão social']"))
-    )
-    filtro_a_z.click()
-    sleep(2)
+    #filtro_a_z = WebDriverWait(driver,5).until(
+        #EC.element_to_be_clickable((By.XPATH, "//th[contains(@class, 'vgt-left-align') and contains(@class, 'sortable')]/span[text()='Razão social']"))
+    #)
+    #filtro_a_z.click()
+    #sleep(2)
 
 
     pasta_cnpjs = os.path.join(os.getcwd(), 'cnpj_empresas')
@@ -876,7 +931,7 @@ def login():
                 #tentando clicar em dívidas ativas
                 try: 
                     divida_ativa = WebDriverWait(driver,5).until(
-                        EC.element_to_be_clickable((By.XPATH,"//div[@class='list-group-item active collapsed']"))
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Dividas ativas']"))
                     )
                     divida_ativa.click()
 
@@ -936,8 +991,7 @@ def login():
                 pyautogui.press('esc')
                 sleep(2)
 
-                criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
-                criar_msgs(caminho_saida="mensagens.xlsx")
+                
 
                 if i + 1 == len(linhas):
                     try:
@@ -953,6 +1007,10 @@ def login():
                         print(f"Erro ao clicar no botão de avançar página: {e}")
                         criar_msg_final()
                         driver.quit()
+                    
+            criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
+            criar_msgs(caminho_saida="mensagens.xlsx")
+            criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief = diretorio_processos_sief)
                         
             pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
