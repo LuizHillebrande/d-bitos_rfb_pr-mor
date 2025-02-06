@@ -5,6 +5,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from tkinter import messagebox
 from PIL import Image
+import pyautogui
+from time import sleep
+import pyperclip
 
 # Credenciais padrão
 DEFAULT_EMAIL = "legal@contabilprimor.com.br"
@@ -15,6 +18,7 @@ def iniciar_webdriver(email, senha):
     try:
         driver = webdriver.Chrome()
         driver.get('https://app.digiliza.com.br/login')
+        driver.maximize_window()
 
         input_email = WebDriverWait(driver, 5).until(
             EC.element_to_be_clickable((By.XPATH, "//input[@id='email']"))
@@ -31,10 +35,33 @@ def iniciar_webdriver(email, senha):
         )
         botao_login.click()
 
-        messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
+        # Esperar até que o botão esteja presente
+        incluir_tarefa_avulsa = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//a[@href='#modalTarefaAvulsa']"))
+        )
 
+        # Usar JavaScript para garantir o clique se necessário
+        driver.execute_script("arguments[0].click();", incluir_tarefa_avulsa)
+
+        sleep(3)
+
+        select_model = WebDriverWait(driver,5).until(
+            EC.element_to_be_clickable((By.XPATH,"//input[@placeholder='Selecione um Modelo']"))
+        )
+        select_model.click()
+        sleep(2)
+
+        texto = "relatório de pendências fiscais"
+        pyperclip.copy(texto)
+        pyautogui.hotkey("ctrl", "v")
+        sleep(2)
+        pyautogui.press('enter')
+        messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
+        sleep(5)
+        driver.quit()
     except Exception as e:
         messagebox.showerror("Erro", f"Falha no login: {e}")
+        
 
 # Criando a interface gráfica
 def criar_interface():
