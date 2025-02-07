@@ -13,13 +13,15 @@ import os
 import re
 import pandas as pd
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from Levenshtein import distance
 
 # Credenciais padrão
 DEFAULT_EMAIL = "legal@contabilprimor.com.br"
 DEFAULT_SENHA = "q7ne5k0la0VJ"
 
-import os
-import pandas as pd
 
 def extrair_nomes_empresas():
     pasta_debitos = "debitos"
@@ -52,10 +54,14 @@ def extrair_nomes_empresas():
     print(f"Arquivo salvo em: {arquivo_saida}")
 
 
+
 # Função para iniciar o WebDriver com as credenciais
 def iniciar_webdriver(email, senha):
+    empresas_nao_enviadas = []
+    total_empresas = contar_pdfs()  # Agora conta os arquivos PDF na pasta 'debitos'
+    total_enviadas = 0
     #relatório de pendências fiscais
-    extrair_nomes_empresas()
+    #extrair_nomes_empresas()
     excel_msg = openpyxl.load_workbook("nomes_empresas\empresas.xlsx")
     sheet_excel_msg = excel_msg.active
     try:
@@ -161,10 +167,21 @@ def iniciar_webdriver(email, senha):
             sleep(3)
 
             #Acessando o elemento com nome da empresa incrementado c f''
+            
+
+            # Captura todas as empresas da tabela
+            nomes_encontrados = [e.text for e in driver.find_elements(By.XPATH, "//td")]
+            print('Nomes encontrados\n')
+            # Encontra o nome mais próximo
+            nome_correto = min(nomes_encontrados, key=lambda x: distance(x.lower(), nome_empresa.lower()))
+            print('Nome correto', nome_correto)
+
+            # Clica no nome encontrado
             elemento_empresa = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, f"//td[contains(text(), '{nome_empresa}')]"))
+                EC.element_to_be_clickable((By.XPATH, f"//td[contains(text(), '{nome_correto}')]"))
             )
             elemento_empresa.click()
+
             sleep(3)
 
             botao_documentos_svg = WebDriverWait(driver,5).until(
@@ -243,22 +260,132 @@ def iniciar_webdriver(email, senha):
                 click_edit_mensagem.click()
 
                 # Copiar e colar usando pyperclip + pyautogui
-                pyperclip.copy(mensagem_personalizada)
-                pyautogui.hotkey("ctrl", "v")
+                click_edit_mensagem.send_keys(mensagem_personalizada)
+                print("Colei")
                 sleep(2)
+
+                botoes = driver.find_elements(By.XPATH, "//button[text()='Salvar']")
+                for botao in botoes:
+                    if botao.is_displayed():
+                        botao.click()
+                        break
+
+                print('Cliquei em salvar')
+                sleep(5)
+                
+                voltar = WebDriverWait(driver,5).until(
+                    EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-transparent rounded-0 text-secondary flex-fill']"))
+                )
+                voltar.click()
+
+                iniciar_etapa = WebDriverWait(driver,5).until(
+                    EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-transparent btn-hover-semi-transparent text-white']"))
+                )
+                iniciar_etapa.click()
+                sleep(5)
+
+                concluir_etapa = WebDriverWait(driver,5).until(
+                    EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-transparent btn-hover-semi-transparent text-white big-chungus']"))
+                )
+                concluir_etapa.click()
+                sleep(3)
+
+                botao_ok = WebDriverWait(driver,5).until(
+                    EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm px-3 py-2 swal2-styled']"))
+                )
+                botao_ok.click()
+
+                total_enviadas += 1
+
+                '''
+                concluir_e_enviar = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[@class='btn btn-success' and contains(text(), 'Concluir e enviar')]"))
+                )
+                concluir_e_enviar.click()
+
+                botao_ok = WebDriverWait(driver,5).until(
+                    EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm px-3 py-2 swal2-styled']"))
+                )
+                botao_ok.click()
+                '''
+                botoes_fechar = driver.find_elements(By.XPATH, "//button[@data-bs-dismiss='modal']")
+                for botao in botoes_fechar:
+                    
+                    if botao.is_displayed():  # Verifica se o botão está visível na tela
+                        botao.click()
+                        break  # Para após clicar no primeiro botão visível
+
+                
+
+                sleep(5)
 
                 print(f"Mensagem enviada para {nome_empresa}: {mensagem_personalizada}")
             else:
+                empresas_nao_enviadas.append(f"{nome_empresa} ({cnpj})")
+                botoes_fechar = driver.find_elements(By.XPATH, "//button[@data-bs-dismiss='offcanvas']")
+                for botao in botoes_fechar:
+                    print('Nao achei a mensagem!')
+                    if botao.is_displayed():  # Verifica se o botão está visível na tela
+                        botao.click()
+                        break  # Para após clicar no primeiro botão visível
                 print(f"⚠ Nenhuma mensagem personalizada encontrada para {nome_empresa} ({cnpj})")
 
+        if empresas_nao_enviadas:
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.append(["Nome da Empresa", "CNPJ"])
+            for empresa in empresas_nao_enviadas:
+                nome, cnpj = empresa.split(" (")
+                cnpj = cnpj[:-1]  # Removendo o parêntese final
+                ws.append([nome, cnpj])
+    
+            wb.save("empresas_nao_enviadas.xlsx")
+            print("Arquivo 'empresas_nao_enviadas.xlsx' salvo com sucesso.")
 
+        # Enviar email com os resultados
+        enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas)
         messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
         sleep(50)
 
         driver.quit()
     except Exception as e:
         print("Erro", f"Falha no login: {e}")
-        
+
+def contar_pdfs():
+    pasta = "debitos"
+    return len([f for f in os.listdir(pasta) if f.endswith(".pdf")])
+
+def enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas):
+    remetente_email = "luiz.logika@gmail.com"  # Altere para seu email
+    senha_email = "primos123"  # Use app password se for Gmail
+    destinatarios = ["luiz.logika@gmail.com", "luiz.hillebrande1505@gmail.com"]
+
+    saudacao = "Bom dia" if datetime.now().hour < 12 else "Boa tarde"
+    lista_empresas = "\n".join(empresas_nao_enviadas)
+
+    mensagem = f"""{saudacao},  
+    Informo que as seguintes empresas não foram enviadas:  
+    {lista_empresas}  
+
+    Havia um total de {total_empresas} empresas (arquivos PDF na pasta 'debitos'), foram enviadas {total_enviadas}.
+    """
+
+    msg = MIMEMultipart()
+    msg["From"] = remetente_email
+    msg["To"] = ", ".join(destinatarios)
+    msg["Subject"] = "Empresas não enviadas"
+
+    msg.attach(MIMEText(mensagem, "plain"))
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)  # Alterar se não for Gmail
+        server.starttls()
+        server.login(remetente_email, senha_email)
+        server.sendmail(remetente_email, destinatarios, msg.as_string())
+        server.quit()
+        print("Email enviado com sucesso!")
+    except Exception as e:
+        print(f"Erro ao enviar email: {e}")
 
 iniciar_webdriver(email='legal@contabilprimor.com.br',senha='q7ne5k0la0VJ')
 # Criando a interface gráfica

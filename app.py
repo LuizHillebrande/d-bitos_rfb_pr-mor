@@ -908,9 +908,9 @@ def login():
     # Encontrar todas as linhas da tabela
     while True:
         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
-        start = len(linhas) - 2 
-        for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
-        #for i, linha in enumerate(linhas):
+        #start = len(linhas) - 2 
+        #for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
+        for i, linha in enumerate(linhas):
             linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
             print("Numero de linhas:",len(linhas))
             print(f'Processando linha {i + 1} de {len(linhas)}')
