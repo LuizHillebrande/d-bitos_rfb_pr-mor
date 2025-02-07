@@ -768,6 +768,14 @@ def login():
     driver.get('https://app.monitorcontabil.com.br/login')
     driver.maximize_window()
 
+    try:
+        confirm_ok = WebDriverWait(driver,3).until(
+            EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm swal-btn-green swal2-styled']"))
+        )
+        confirm_ok.click()
+    except:
+        print('N tinha botao de ok')
+
     sleep(2)
 
     logar_email = WebDriverWait(driver,5).until(
@@ -812,11 +820,12 @@ def login():
             break
         
     sleep(3)
-
-    baixar_relatorios = WebDriverWait(driver,15).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@title='O download será feito conforme os filtros atualmente selecionados'] [1]"))
+    
+    baixar_relatorios = WebDriverWait(driver, 15).until(
+        EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Baixar situações']]"))
     )
     baixar_relatorios.click()
+
 
     baixar_popup = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-success']"))
@@ -878,12 +887,12 @@ def login():
         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
         start = len(linhas) - 2 
         for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
+        #for i, linha in enumerate(linhas):
             linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
             print("Numero de linhas:",len(linhas))
             print(f'Processando linha {i + 1} de {len(linhas)}')
             try:
                 print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
-                print(f'🔎 HTML da linha:\n{linha.get_attribute("outerHTML")}\n')
                 # Extrair o CNPJ
                 cnpj_element = linha.find_element(By.XPATH, ".//td[contains(@class, 'col-tamanho-cnpj')]//span/span/span")
                 cnpj = re.sub(r'[^0-9]', '', cnpj_element.text)

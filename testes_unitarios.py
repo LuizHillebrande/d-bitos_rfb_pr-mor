@@ -9,7 +9,7 @@ def comparar_empresas(nome_empresa1, nome_empresa2):
 
 # Testando a função
 nome_empresa1 = "07611951000146_Silva E Lima Moveis Ltda"
-nome_empresa2 = "07611951000227_Silva & Lima Moveis Ltda"
+nome_empresa2 = "07611951000227_Silva gianluquinhas"
 
 similaridade = comparar_empresas(nome_empresa1, nome_empresa2)
 print(f"A similaridade entre as duas empresas é: {similaridade}%")

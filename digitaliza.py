@@ -54,6 +54,7 @@ def extrair_nomes_empresas():
 
 # Função para iniciar o WebDriver com as credenciais
 def iniciar_webdriver(email, senha):
+    #relatório de pendências fiscais
     extrair_nomes_empresas()
     excel_msg = openpyxl.load_workbook("nomes_empresas\empresas.xlsx")
     sheet_excel_msg = excel_msg.active
@@ -229,7 +230,7 @@ def iniciar_webdriver(email, senha):
                 cnpj_planilha = str(linha[0].value)
                 print(f'Cnpj {cnpj_planilha}')
                 mensagem = str(linha[1].value)
-                print(f'Mensagem {mensagem}')
+                #print(f'Mensagem {mensagem}')
                 if str(cnpj).strip() == str(cnpj_planilha).strip():  # Comparar sem espaços extras
                     mensagem_personalizada = mensagem
                     break
