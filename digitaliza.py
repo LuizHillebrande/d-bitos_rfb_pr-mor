@@ -83,6 +83,7 @@ def iniciar_webdriver(email, senha):
             data_atual = datetime.now().strftime("%d/%m/%y")
             competencia_padrao = datetime.now().strftime("%m/%y")
             nome_empresa = linha[0].value
+            cnpj = linha[1].value
             input_complemento = f'Análise de pendências da competência {data_atual}'
             # Esperar até que o botão esteja presente
             incluir_tarefa_avulsa = WebDriverWait(driver, 10).until(
@@ -134,7 +135,9 @@ def iniciar_webdriver(email, senha):
             competencia.click()
             competencia.clear()
             competencia.send_keys(competencia_padrao)
-
+            
+            '''
+            #n precisa disso pq sempre vai ser primor contabil o responsavel
             responsavel = WebDriverWait(driver,5).until(
                 EC.element_to_be_clickable((By.XPATH,"//div[@class='v-select vs--single vs--searchable mh-sm scrollbar scrollbar-3']"))
             )
@@ -143,31 +146,122 @@ def iniciar_webdriver(email, senha):
             texto_responsavel = 'Prímor Contábil'
             pyperclip.copy(texto_responsavel)
             pyautogui.hotkey("ctrl", "v")
-            sleep(1)
+            print('dei ctrl v')
+            sleep(15)
             pyautogui.press('enter')
+            '''
 
-            sleep(20)
+            sleep(5)
 
             botao_salvar = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Salvar e ir à(s) Tarefa(s)')]"))
             )
             botao_salvar.click()
+            sleep(3)
 
-            sleep(20)
+            #Acessando o elemento com nome da empresa incrementado c f''
+            elemento_empresa = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, f"//td[contains(text(), '{nome_empresa}')]"))
+            )
+            elemento_empresa.click()
+            sleep(3)
+
+            botao_documentos_svg = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-transparent rounded-0 text-primary flex-fill']"))
+            )
+            botao_documentos_svg.click()
+            print('Acessei a aba de documentos')
+            sleep(3)
+
+            # Diretório onde estão os PDFs
+            pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+
+            # Construir padrão do nome do arquivo
+            padrao_arquivo = f"{cnpj}_*.pdf"
+
+            # Procurar o arquivo correto na pasta
+            arquivos_encontrados = [f for f in os.listdir(pasta_debitos) if f.startswith(f"{cnpj}_") and f.endswith(".pdf")]
+
+            if arquivos_encontrados:
+                caminho_arquivo = os.path.join(pasta_debitos, arquivos_encontrados[0])  # Pega o primeiro encontrado
 
 
+                # Localizar o campo de upload oculto e enviar o arquivo
+                campo_upload = WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, "//input[@type='file']"))
+                )
+                campo_upload.send_keys(caminho_arquivo)
 
+                print(f"Arquivo {caminho_arquivo} anexado com sucesso!")
+
+                try:
+                    aceitar_pop_up = WebDriverWait(driver,3).until(
+                        EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm px-3 py-2 swal2-styled swal2-default-outline']"))
+                    )
+                    aceitar_pop_up.click()
+
+                except:
+                    print('n tinha pop up')
+                sleep(2)
+            else:
+                print(f"Nenhum arquivo encontrado para {nome_empresa} ({cnpj})")
+
+            # Esperar o upload ser processado (caso tenha carregamento)
+            sleep(5) 
+
+            enviar_msg = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-transparent px-1 py-0'] [1]"))
+            )
+            enviar_msg.click()
+
+            click_edit_mensagem = WebDriverWait(driver,5).until(
+                EC.element_to_be_clickable((By.XPATH,"//div[@class='ql-editor ql-blank']"))
+            )
+            click_edit_mensagem.click()
+
+            # Abrir o arquivo mensagens.xlsx
+            excel_mensagens = openpyxl.load_workbook("mensagens.xlsx")
+            sheet_mensagens = excel_mensagens.active
+
+            # Procurar o CNPJ na coluna 0 e pegar a mensagem da coluna 1
+            mensagem_personalizada = None
+            for linha in sheet_mensagens.iter_rows(min_row=2, max_row=10):
+                cnpj_planilha = str(linha[0].value)
+                print(f'Cnpj {cnpj_planilha}')
+                mensagem = str(linha[1].value)
+                print(f'Mensagem {mensagem}')
+                if str(cnpj).strip() == str(cnpj_planilha).strip():  # Comparar sem espaços extras
+                    mensagem_personalizada = mensagem
+                    break
+
+            # Se encontrou a mensagem, colar no campo de edição
+            if mensagem_personalizada:
+                click_edit_mensagem = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//div[@class='ql-editor ql-blank']"))
+                )
+                click_edit_mensagem.click()
+
+                # Copiar e colar usando pyperclip + pyautogui
+                pyperclip.copy(mensagem_personalizada)
+                pyautogui.hotkey("ctrl", "v")
+                sleep(2)
+
+                print(f"Mensagem enviada para {nome_empresa}: {mensagem_personalizada}")
+            else:
+                print(f"⚠ Nenhuma mensagem personalizada encontrada para {nome_empresa} ({cnpj})")
 
 
         messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
-        sleep(5)
+        sleep(50)
 
         driver.quit()
     except Exception as e:
-        messagebox.showerror("Erro", f"Falha no login: {e}")
+        print("Erro", f"Falha no login: {e}")
         
 
+iniciar_webdriver(email='legal@contabilprimor.com.br',senha='q7ne5k0la0VJ')
 # Criando a interface gráfica
+'''
 def criar_interface():
     def fazer_login():
         email = email_entry.get()
@@ -244,3 +338,4 @@ def criar_interface():
 
 # Iniciar a interface
 criar_interface()
+'''
