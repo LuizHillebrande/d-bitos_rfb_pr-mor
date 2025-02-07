@@ -360,44 +360,67 @@ def criar_msg_final():
 
 
 
+import os
+import re
+
 def extrair_nome_empresa_e_cnpj(nome_arquivo):
     """
-    Extrai o nome da empresa e o CNPJ do nome do arquivo PDF.
-    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Arquivo.pdf'.
+    Extrai o nome da empresa e o CNPJ ou CPF do nome do arquivo PDF.
+    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Empresa.pdf' ou 'situacao_fiscal--CPF-Nome_Empresa.pdf'.
+    Retorna (nome_empresa, cnpj, cpf).
     """
-    # Expressão regular para capturar o CNPJ
-    cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
-    if cnpj:
-        cnpj = cnpj.group(1)  # Extrai o CNPJ
+    cnpj = None
+    cpf = None
 
-    # Remove o prefixo 'situacao_fiscal--CNPJ-' e qualquer código no final
-    nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
-    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
-    
-    return nome_limpo.strip(), cnpj
+    # Expressão regular para capturar o CNPJ (14 dígitos)
+    match_cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
+    if match_cnpj:
+        cnpj = match_cnpj.group(1)
+        nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
+    else:
+        # Expressão regular para capturar o CPF (11 dígitos)
+        match_cpf = re.search(r"situacao_fiscal--(\d{11})-", nome_arquivo)
+        if match_cpf:
+            cpf = match_cpf.group(1)
+            nome_limpo = re.sub(r"situacao_fiscal--\d{11}-", "", nome_arquivo)
+        else:
+            return None, None, None  # Se não encontrar CNPJ ou CPF, retorna tudo `None`
+
+    # Remover sufixos numéricos antes da extensão .pdf, se existirem (ex: "_12345.pdf")
+    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo).replace(".pdf", "").strip()
+
+    return nome_limpo, cnpj, cpf
+
 
 def renomear_pdfs_com_cnpj(pasta):
     """
-    Itera sobre todos os PDFs da pasta e renomeia, usando o CNPJ como ID único.
+    Itera sobre todos os PDFs da pasta e renomeia, usando o CNPJ ou CPF como identificador único.
     """
     for arquivo in os.listdir(pasta):
         if arquivo.endswith(".pdf"):
             caminho_antigo = os.path.join(pasta, arquivo)
-            nome_empresa, cnpj = extrair_nome_empresa_e_cnpj(arquivo)
-            
-            # Criar o novo nome do arquivo com CNPJ
+            nome_empresa, cnpj, cpf = extrair_nome_empresa_e_cnpj(arquivo)
+
+            # Criar o novo nome do arquivo, priorizando CNPJ sobre CPF
             if cnpj:
                 novo_nome = f"{cnpj}_{nome_empresa}.pdf"
-                caminho_novo = os.path.join(pasta, novo_nome)
-                
-                # Renomeia o arquivo
-                os.rename(caminho_antigo, caminho_novo)
-                print(f"Renomeado: {arquivo} → {novo_nome}")
+            elif cpf:
+                novo_nome = f"{cpf}_{nome_empresa}.pdf"
             else:
-                print(f"Não foi possível extrair o CNPJ de: {arquivo}")
+                print(f"⚠️ Não foi possível extrair CNPJ ou CPF de: {arquivo}")
+                continue  # Pula para o próximo arquivo
+
+            caminho_novo = os.path.join(pasta, novo_nome)
+
+            # Renomeia o arquivo
+            os.rename(caminho_antigo, caminho_novo)
+            print(f"✅ Renomeado: {arquivo} → {novo_nome}")
+
 
 # Defina a pasta onde estão os PDFs
 pasta_pdfs = "debitos"
+
+
 
 def consultar_pdf_da_empresa(nome_empresa, numeros_procurados):
     # Caminho da pasta onde os PDFs foram baixados/descompactados
