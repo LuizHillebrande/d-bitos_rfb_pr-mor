@@ -66,25 +66,37 @@ def iniciar_webdriver(email, senha):
     sheet_excel_msg = excel_msg.active
     try:
         driver = webdriver.Chrome()
-        driver.get('https://app.digiliza.com.br/login')
+        driver.get("https://app.digiliza.com.br/login")
         driver.maximize_window()
 
-        input_email = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@id='email']"))
-        )
-        input_email.send_keys(email)
 
-        input_senha = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@id='password']"))
-        )
-        input_senha.send_keys(senha)
+        for linha in sheet_excel_msg.iter_rows(min_row=2, max_row=100):
+            contador_vazios = 0
+            if linha!=2:
+                try:
+                    driver.quit()  # Fecha antes de iniciar (se já estiver rodando)
+                    # Inicia um novo WebDriver
+                    driver = webdriver.Chrome()  
+                    driver.get("https://app.digiliza.com.br/login")
+                    driver.maximize_window()
+                    input_email = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//input[@id='email']"))
+                    )
+                    input_email.send_keys(email)
 
-        botao_login = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@type='submit']"))
-        )
-        botao_login.click()
+                    input_senha = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//input[@id='password']"))
+                    )
+                    input_senha.send_keys(senha)
 
-        for linha in sheet_excel_msg.iter_rows(min_row=2, max_row=1000):
+                    botao_login = WebDriverWait(driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//button[@type='submit']"))
+                    )
+                    botao_login.click()
+                except:
+                    pass
+            
+    
             data_vcto_input_padrao = datetime.now().strftime("27/%m/%Y")
             print('Lopacarai',data_vcto_input_padrao)
             data_atual = datetime.now().strftime("%d/%m/%y")
@@ -92,6 +104,11 @@ def iniciar_webdriver(email, senha):
             nome_empresa = linha[0].value
             cnpj = linha[1].value
             input_complemento = f'Análise de pendências da competência {data_atual}'
+
+            if not nome_empresa or not cnpj:
+                driver.quit()
+                messagebox.showinfo('Sucesso!', 'Mensagens enviadas com sucesso!')
+                break
             # Esperar até que o botão esteja presente
             incluir_tarefa_avulsa = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//a[@href='#modalTarefaAvulsa']"))
@@ -165,6 +182,30 @@ def iniciar_webdriver(email, senha):
             )
             botao_salvar.click()
             sleep(3)
+
+            # Supondo que 'driver' já esteja inicializado
+            try:
+                # Espera até 2 segundos para encontrar o título do erro
+                WebDriverWait(driver, 2).until(
+                    EC.presence_of_element_located((By.XPATH, "//h2[@id='swal2-title' and contains(text(), 'Erro ao criar tarefa(s)')]"))
+                )
+                
+                # Se encontrar, espera o botão "OK" e clica nele
+                btn_ok = WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'swal2-confirm')]"))
+                )
+                btn_ok.click()
+                print("Botão 'OK' clicado com sucesso.")
+
+                empresas_nao_enviadas.append(f"{nome_empresa} ({cnpj})")
+                continue
+            except Exception as e:  
+                if "WinError 6" in str(e) or "chrome not reachable" in str(e):
+                    print("ChromeDriver fechou inesperadamente. Reiniciando...")
+                    driver.quit()
+                    driver = webdriver.Chrome()  # Inicia um novo WebDriver
+                    print("Mensagem de erro não encontrada dentro do tempo limite.")
+
 
             #Acessando o elemento com nome da empresa incrementado c f''
             
@@ -322,12 +363,14 @@ def iniciar_webdriver(email, senha):
                 print(f"Mensagem enviada para {nome_empresa}: {mensagem_personalizada}")
             else:
                 empresas_nao_enviadas.append(f"{nome_empresa} ({cnpj})")
+                '''
                 botoes_fechar = driver.find_elements(By.XPATH, "//button[@data-bs-dismiss='offcanvas']")
                 for botao in botoes_fechar:
                     print('Nao achei a mensagem!')
                     if botao.is_displayed():  # Verifica se o botão está visível na tela
                         botao.click()
                         break  # Para após clicar no primeiro botão visível
+                '''
                 print(f"⚠ Nenhuma mensagem personalizada encontrada para {nome_empresa} ({cnpj})")
 
         if empresas_nao_enviadas:
@@ -347,7 +390,8 @@ def iniciar_webdriver(email, senha):
         messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
         sleep(50)
 
-        driver.quit()
+        if driver.service.is_connectable():
+            driver.quit()
     except Exception as e:
         print("Erro", f"Falha no login: {e}")
 
@@ -356,8 +400,8 @@ def contar_pdfs():
     return len([f for f in os.listdir(pasta) if f.endswith(".pdf")])
 
 def enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas):
-    remetente_email = "luiz.logika@gmail.com"  # Altere para seu email
-    senha_email = "primos123"  # Use app password se for Gmail
+    remetente_email = "luizhill.dev@gmail.com"  # Altere para seu email
+    senha_email = "nqlf fgch thrs kpht"  # Use app password se for Gmail
     destinatarios = ["luiz.logika@gmail.com", "luiz.hillebrande1505@gmail.com"]
 
     saudacao = "Bom dia" if datetime.now().hour < 12 else "Boa tarde"
