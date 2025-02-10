@@ -28,6 +28,8 @@ from fuzzywuzzy import process
 from datetime import datetime
 import textwrap
 
+
+
 # Caminho para a pasta "resultados"
 diretorio_resultados = os.path.join(os.getcwd(), 'resultados')
 # Caminhos para as pastas e arquivos
@@ -53,7 +55,7 @@ def salvar_mensagem(df_existente, nome_empresa, nova_mensagem, caminho_saida):
     print(f"Nome mais próximo encontrado: {nome_mais_proximo}, Score: {score}")
 
     # Se encontrou uma correspondência confiável, usa o nome existente
-    if nome_mais_proximo and score >= 80:
+    if nome_mais_proximo and score >= 93:
         nome_empresa = nome_mais_proximo
         print(f"Usando nome mais próximo: {nome_empresa}")
 
@@ -68,12 +70,6 @@ def salvar_mensagem(df_existente, nome_empresa, nova_mensagem, caminho_saida):
 
     return df_existente
 
-
-
-import os
-import pandas as pd
-from datetime import datetime
-import re
 
 diretorio_processos_sief = os.path.join(os.getcwd(), 'processos sief')
 
@@ -360,67 +356,44 @@ def criar_msg_final():
 
 
 
-import os
-import re
-
 def extrair_nome_empresa_e_cnpj(nome_arquivo):
     """
-    Extrai o nome da empresa e o CNPJ ou CPF do nome do arquivo PDF.
-    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Empresa.pdf' ou 'situacao_fiscal--CPF-Nome_Empresa.pdf'.
-    Retorna (nome_empresa, cnpj, cpf).
+    Extrai o nome da empresa e o CNPJ do nome do arquivo PDF.
+    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Arquivo.pdf'.
     """
-    cnpj = None
-    cpf = None
+    # Expressão regular para capturar o CNPJ
+    cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
+    if cnpj:
+        cnpj = cnpj.group(1)  # Extrai o CNPJ
 
-    # Expressão regular para capturar o CNPJ (14 dígitos)
-    match_cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
-    if match_cnpj:
-        cnpj = match_cnpj.group(1)
-        nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
-    else:
-        # Expressão regular para capturar o CPF (11 dígitos)
-        match_cpf = re.search(r"situacao_fiscal--(\d{11})-", nome_arquivo)
-        if match_cpf:
-            cpf = match_cpf.group(1)
-            nome_limpo = re.sub(r"situacao_fiscal--\d{11}-", "", nome_arquivo)
-        else:
-            return None, None, None  # Se não encontrar CNPJ ou CPF, retorna tudo `None`
-
-    # Remover sufixos numéricos antes da extensão .pdf, se existirem (ex: "_12345.pdf")
-    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo).replace(".pdf", "").strip()
-
-    return nome_limpo, cnpj, cpf
-
+    # Remove o prefixo 'situacao_fiscal--CNPJ-' e qualquer código no final
+    nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
+    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
+    
+    return nome_limpo.strip(), cnpj
 
 def renomear_pdfs_com_cnpj(pasta):
     """
-    Itera sobre todos os PDFs da pasta e renomeia, usando o CNPJ ou CPF como identificador único.
+    Itera sobre todos os PDFs da pasta e renomeia, usando o CNPJ como ID único.
     """
     for arquivo in os.listdir(pasta):
         if arquivo.endswith(".pdf"):
             caminho_antigo = os.path.join(pasta, arquivo)
-            nome_empresa, cnpj, cpf = extrair_nome_empresa_e_cnpj(arquivo)
-
-            # Criar o novo nome do arquivo, priorizando CNPJ sobre CPF
+            nome_empresa, cnpj = extrair_nome_empresa_e_cnpj(arquivo)
+            
+            # Criar o novo nome do arquivo com CNPJ
             if cnpj:
                 novo_nome = f"{cnpj}_{nome_empresa}.pdf"
-            elif cpf:
-                novo_nome = f"{cpf}_{nome_empresa}.pdf"
+                caminho_novo = os.path.join(pasta, novo_nome)
+                
+                # Renomeia o arquivo
+                os.rename(caminho_antigo, caminho_novo)
+                print(f"Renomeado: {arquivo} → {novo_nome}")
             else:
-                print(f"⚠️ Não foi possível extrair CNPJ ou CPF de: {arquivo}")
-                continue  # Pula para o próximo arquivo
-
-            caminho_novo = os.path.join(pasta, novo_nome)
-
-            # Renomeia o arquivo
-            os.rename(caminho_antigo, caminho_novo)
-            print(f"✅ Renomeado: {arquivo} → {novo_nome}")
-
+                print(f"Não foi possível extrair o CNPJ de: {arquivo}")
 
 # Defina a pasta onde estão os PDFs
 pasta_pdfs = "debitos"
-
-
 
 def consultar_pdf_da_empresa(nome_empresa, numeros_procurados):
     # Caminho da pasta onde os PDFs foram baixados/descompactados
@@ -791,14 +764,6 @@ def login():
     driver.get('https://app.monitorcontabil.com.br/login')
     driver.maximize_window()
 
-    try:
-        confirm_ok = WebDriverWait(driver,3).until(
-            EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm swal-btn-green swal2-styled']"))
-        )
-        confirm_ok.click()
-    except:
-        print('N tinha botao de ok')
-
     sleep(2)
 
     logar_email = WebDriverWait(driver,5).until(
@@ -843,12 +808,11 @@ def login():
             break
         
     sleep(3)
-    
-    baixar_relatorios = WebDriverWait(driver, 15).until(
-        EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Baixar situações']]"))
+
+    baixar_relatorios = WebDriverWait(driver,15).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@title='O download será feito conforme os filtros atualmente selecionados'] [1]"))
     )
     baixar_relatorios.click()
-
 
     baixar_popup = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-success']"))
@@ -908,23 +872,20 @@ def login():
     # Encontrar todas as linhas da tabela
     while True:
         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
-        #start = len(linhas) - 2 
-        #for i, linha in enumerate(linhas[start:], start=start):  # Define o início da iteração
-        for i, linha in enumerate(linhas):
+
+        for i, linha in enumerate(linhas):  # Define o início da iteração
             linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
             print("Numero de linhas:",len(linhas))
             print(f'Processando linha {i + 1} de {len(linhas)}')
             try:
                 print(f'Processando linha {linhas.index(linha) + 1} de {len(linhas)}')
                 # Extrair o CNPJ
-                cnpj_element = linha.find_element(By.XPATH, ".//td[contains(@class, 'col-tamanho-cnpj')]//span/span/span")
-                cnpj = re.sub(r'[^0-9]', '', cnpj_element.text)
+                cnpj = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align.col-tamanho-cnpj span span span").text
+                cnpj = re.sub(r'[^0-9]', '', cnpj)
+                # Extrair o Nome da Empresa
+                nome_empresa = linha.find_element(By.CSS_SELECTOR, "td.vgt-left-align span span span").text
 
-                # Encontrar o Nome da Empresa dentro da linha específica
-                nome_empresa_element = linha.find_element(By.XPATH, ".//td[contains(@class, 'vgt-left-align')]//span/span/span")
-                nome_empresa = nome_empresa_element.text
-
-                print(f"Empresaaa: {nome_empresa} | CNPJ: {cnpj}")
+                print(f"Empresa: {nome_empresa} | CNPJ: {cnpj}")
 
                 # Encontrar e clicar na lupa correspondente
                 lupa = linha.find_element(By.XPATH, ".//button[@class='btn btn btn-none rounded-pill m-0 icone-acao p-0 btn-none btn-none'][2]")
@@ -1035,24 +996,21 @@ def login():
                             EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Go to next page']"))
                         )
                         pula_pagina.click()
-                        sleep(3)
                         print("Avançando para a próxima página...")
                         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
                         print("Numero de linhas:",len(linhas))
                     except Exception as e:
-                        print("Processando mensagens finais...")
-                        criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida="mensagens.xlsx")
-                        criar_msgs(caminho_saida="mensagens.xlsx")
-                        criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief=diretorio_processos_sief)
-                        criar_msg_final()
                         print(f"Erro ao clicar no botão de avançar página: {e}")
+                        criar_msg_final()
                         driver.quit()
-        
-        
+                    
+            criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
+            criar_msgs(caminho_saida="mensagens.xlsx")
+            criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief = diretorio_processos_sief)
                         
-        pasta_debitos = os.path.join(os.getcwd(), 'debitos')
+            pasta_debitos = os.path.join(os.getcwd(), 'debitos')
 
-from PIL import Image, ImageTk
+
 
 
 def atualizar_informacoes(frame):
@@ -1123,7 +1081,7 @@ app.geometry("900x600")
 app.title("Sistema de Extração de Débitos - Primor")
 
 # Menu lateral
-menu_frame = ctk.CTkFrame(app, width=200, corner_radius=0)
+menu_frame = ctk.CTkFrame(app, width=250, corner_radius=0)
 menu_frame.pack(side="left", fill="y")
 
 menu_label = ctk.CTkLabel(
@@ -1142,6 +1100,15 @@ extrair_button = ctk.CTkButton(
     font=("Arial", 16, "bold"),
 )
 extrair_button.pack(pady=20, padx=10)
+
+#teste
+digitaliza = ctk.CTkButton(
+    menu_frame,
+    text="Enviar mensagens",
+    command=...,
+    font=("Arial", 16, "bold"),
+)
+digitaliza.pack(pady=20, padx=10)
 
 # Área principal
 main_frame = ctk.CTkFrame(app, corner_radius=10)

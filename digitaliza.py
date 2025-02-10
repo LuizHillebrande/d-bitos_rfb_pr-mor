@@ -402,7 +402,7 @@ def contar_pdfs():
 def enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas):
     remetente_email = "luizhill.dev@gmail.com"  # Altere para seu email
     senha_email = "nqlf fgch thrs kpht"  # Use app password se for Gmail
-    destinatarios = ["luiz.logika@gmail.com", "luiz.hillebrande1505@gmail.com"]
+    destinatarios = ["fiscal@contabilprimor.com.br", "pessoal@contabilprimor.com.br"]
 
     saudacao = "Bom dia" if datetime.now().hour < 12 else "Boa tarde"
     lista_empresas = "\n".join(empresas_nao_enviadas)
@@ -431,9 +431,7 @@ def enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas):
     except Exception as e:
         print(f"Erro ao enviar email: {e}")
 
-iniciar_webdriver(email='legal@contabilprimor.com.br',senha='q7ne5k0la0VJ')
-# Criando a interface gráfica
-'''
+
 def criar_interface():
     def fazer_login():
         email = email_entry.get()
@@ -510,4 +508,4 @@ def criar_interface():
 
 # Iniciar a interface
 criar_interface()
-'''
+
