@@ -1,3 +1,4 @@
+#DIGILIZA
 import customtkinter as ctk
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -62,7 +63,7 @@ def iniciar_webdriver(email, senha):
     total_enviadas = 0
     #relatório de pendências fiscais
     #extrair_nomes_empresas()
-    excel_msg = openpyxl.load_workbook("nomes_empresas\empresas.xlsx")
+    excel_msg = openpyxl.load_workbook(r"nomes_empresas\empresas.xlsx")
     sheet_excel_msg = excel_msg.active
     try:
         driver = webdriver.Chrome()
@@ -432,14 +433,20 @@ def enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas):
         print(f"Erro ao enviar email: {e}")
 
 
+eye_open = ctk.CTkImage(Image.open(r"imgs\eye_open.png"), size=(24, 24))
+eye_closed = ctk.CTkImage(Image.open(r"imgs\eye_closed.png"), size=(24, 24))
+
+'''
 def criar_interface():
+    global eye_open, eye_closed  # As imagens devem ser criadas globalmente
+
     def fazer_login():
         email = email_entry.get()
         senha = senha_entry.get()
         iniciar_webdriver(email, senha)
 
     def toggle_password():
-        """ Alterna entre exibir ou ocultar a senha """
+        """Alterna entre exibir ou ocultar a senha"""
         if senha_entry.cget("show") == "*":
             senha_entry.configure(show="")
             toggle_button.configure(image=eye_open)
@@ -447,65 +454,57 @@ def criar_interface():
             senha_entry.configure(show="*")
             toggle_button.configure(image=eye_closed)
 
-    app = ctk.CTk()
-    app.title("Login - Digiliza")
-    app.geometry(f"{app.winfo_screenwidth()}x{app.winfo_screenheight()}+0+0")  # Tela cheia
-    ctk.set_appearance_mode("dark")
-    ctk.set_default_color_theme("blue")
+    # Limpa apenas o conteúdo do info_frame
+    for widget in info_frame.winfo_children():
+        widget.destroy()
 
-    # Fundo estilizado
-    bg_frame = ctk.CTkFrame(master=app, fg_color="#1E1E1E")
-    bg_frame.pack(fill="both", expand=True)
+    # Cria a interface de login dentro do info_frame
+    login_frame = ctk.CTkFrame(master=info_frame, width=400, height=500, corner_radius=20, fg_color="#2E2E2E")
+    login_frame.place(relx=0.5, rely=0.5, anchor="center")
 
-    # Container do login centralizado
-    frame = ctk.CTkFrame(master=bg_frame, width=400, height=500, corner_radius=20, fg_color="#2E2E2E")
-    frame.place(relx=0.5, rely=0.5, anchor="center")
-
-    titulo = ctk.CTkLabel(master=frame, text="Login no Digiliza", font=("Arial", 24, "bold"), text_color="#00A3FF")
+    titulo = ctk.CTkLabel(master=login_frame, text="Login no Digiliza", font=("Arial", 24, "bold"), text_color="#00A3FF")
     titulo.pack(pady=20)
 
-    email_label = ctk.CTkLabel(master=frame, text="E-mail:", text_color="white")
+    email_label = ctk.CTkLabel(master=login_frame, text="E-mail:", text_color="white")
     email_label.pack()
-    email_entry = ctk.CTkEntry(master=frame, width=300, height=40, corner_radius=10)
+    email_entry = ctk.CTkEntry(master=login_frame, width=300, height=40, corner_radius=10)
     email_entry.insert(0, DEFAULT_EMAIL)
     email_entry.pack(pady=5)
 
-    senha_label = ctk.CTkLabel(master=frame, text="Senha:", text_color="white")
+    senha_label = ctk.CTkLabel(master=login_frame, text="Senha:", text_color="white")
     senha_label.pack()
 
-    # Campo de senha com botão de exibição
-    senha_frame = ctk.CTkFrame(master=frame, fg_color="transparent")
+    # Frame para o campo de senha e botão de exibição
+    senha_frame = ctk.CTkFrame(master=login_frame, fg_color="transparent")
     senha_frame.pack()
 
     senha_entry = ctk.CTkEntry(master=senha_frame, width=260, height=40, corner_radius=10, show="*")
     senha_entry.insert(0, DEFAULT_SENHA)
     senha_entry.pack(side="left", pady=5)
 
-    # Ícones para alternar a visibilidade da senha
-    eye_open = ctk.CTkImage(light_image=Image.open("imgs\eye_open.png"), size=(24, 24))
-    eye_closed = ctk.CTkImage(light_image=Image.open("imgs\eye_closed.png"), size=(24, 24))
-
-    toggle_button = ctk.CTkButton(master=senha_frame, width=40, height=40, text="", image=eye_closed,
-                                  fg_color="transparent", hover_color="#444", command=toggle_password)
+    toggle_button = ctk.CTkButton(
+        master=senha_frame,
+        width=40,
+        height=40,
+        text="",
+        image=eye_closed,  # Imagem padrão (senha oculta)
+        fg_color="transparent",
+        hover_color="#444",
+        command=toggle_password
+    )
+    toggle_button.image = eye_closed  # Mantém a referência da imagem
     toggle_button.pack(side="right", padx=5)
 
-    # Botão estilizado
-    def on_enter(e):
-        login_button.configure(fg_color="#0088CC")  # Azul mais vibrante ao passar o mouse
-
-    def on_leave(e):
-        login_button.configure(fg_color="#00A3FF")  # Retorna ao azul original
-
-    login_button = ctk.CTkButton(master=frame, text="Login", command=fazer_login, 
-                                 width=300, height=50, corner_radius=10, fg_color="#00A3FF", text_color="white",
-                                 hover_color="#0088CC")
+    login_button = ctk.CTkButton(
+        master=login_frame,
+        text="Login",
+        command=fazer_login,
+        width=300,
+        height=50,
+        corner_radius=10,
+        fg_color="#00A3FF",
+        text_color="white",
+        hover_color="#0088CC"
+    )
     login_button.pack(pady=20)
-
-    login_button.bind("<Enter>", on_enter)
-    login_button.bind("<Leave>", on_leave)
-
-    app.mainloop()
-
-# Iniciar a interface
-criar_interface()
-
+    '''

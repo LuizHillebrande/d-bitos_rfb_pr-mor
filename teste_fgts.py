@@ -173,7 +173,20 @@ def pegar_debitos_fgts():
         EC.element_to_be_clickable((By.XPATH,"//button[@id='login-certificate']"))
     )
     entry_certificate.click()
-    sleep(3)
+    sleep(5)
+
+    try:
+        hcaptcha_iframe = driver.find_element(By.XPATH, "//iframe[contains(@src, 'hcaptcha')]")
+        if hcaptcha_iframe:
+            print("hCaptcha detectado via Selenium.")
+            driver.quit()
+            sleep(10)
+            pegar_debitos_fgts()
+            return
+    except Exception as e:
+        # Se não encontrar, continua
+        pass
+
 
     pyautogui.click(738,191, duration=2)
     sleep(5)
@@ -371,5 +384,46 @@ def pegar_debitos_fgts():
     driver.quit()
 pegar_debitos_fgts()
 
+'''
 
-    
+def criar_interface_fgts():
+    # Limpa somente o conteúdo do info_frame (área dinâmica)
+    for widget in info_frame.winfo_children():
+        widget.destroy()
+
+    # Cria um frame para a interface do FGTS Digital
+    fgts_frame = ctk.CTkFrame(master=info_frame, width=400, height=500, corner_radius=20, fg_color="#2E2E2E")
+    fgts_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+    # Título para a interface do FGTS Digital
+    titulo_fgts = ctk.CTkLabel(
+        master=fgts_frame,
+        text="FGTS Digital",
+        font=("Arial", 24, "bold"),
+        text_color="#00A3FF"
+    )
+    titulo_fgts.pack(pady=20)
+
+    # Instrução ou informações adicionais
+    instrucao_fgts = ctk.CTkLabel(
+        master=fgts_frame,
+        text="Clique no botão abaixo para extrair débitos FGTS.",
+        font=("Arial", 16),
+        text_color="white"
+    )
+    instrucao_fgts.pack(pady=10)
+
+    # Botão para chamar a função de extração dos débitos FGTS
+    extrair_fgts_button = ctk.CTkButton(
+        master=fgts_frame,
+        text="Extrair Débitos FGTS",
+        command=pegar_debitos_fgts,  # Função que você já definiu para extrair os débitos
+        width=300,
+        height=50,
+        corner_radius=10,
+        fg_color="#00A3FF",
+        text_color="white",
+        hover_color="#0088CC"
+    )
+    extrair_fgts_button.pack(pady=20)
+'''
