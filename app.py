@@ -1007,7 +1007,49 @@ def salvar_mensagem(df_existente, nome_empresa, nova_mensagem, caminho_saida):
     return df_existente
 
 
+
 diretorio_processos_sief = os.path.join(os.getcwd(), 'processos sief')
+
+def criar_msg_fgts():
+    # Carregar os arquivos
+    fgts_df = pd.read_excel("debitos_fgts.xlsx")
+    mensagens_df = pd.read_excel("mensagens.xlsx")
+
+    # Criar um dicionário para agrupar os débitos por empresa
+    fgts_dict = {}
+    for _, row in fgts_df.iterrows():
+        nome_completo = row["Nome da Empresa"]
+        cnpj, nome_empresa = nome_completo.split("_", 1)
+        mes_ref = row["Mês Ref."]
+        valor = row["Valor Débitos"]
+        
+        if cnpj not in fgts_dict:
+            fgts_dict[cnpj] = {"nome": nome_empresa, "debitos": {}}
+        
+        if mes_ref not in fgts_dict[cnpj]["debitos"]:
+            fgts_dict[cnpj]["debitos"][mes_ref] = 0
+        
+        fgts_dict[cnpj]["debitos"][mes_ref] += valor
+
+    # Criar ou atualizar as mensagens
+    for cnpj, data in fgts_dict.items():
+        nome_empresa = data["nome"]
+        debitos_texto = ", ".join([f"{mes}: R$ {valor:.2f}" for mes, valor in data["debitos"].items()])
+        
+        if cnpj in mensagens_df["Empresa"].astype(str).values:
+            print('tinha o cnpj', cnpj)
+            mensagem_fgts = f"{nome_empresa}, você também possui débitos de FGTS: " + ", ".join(
+                [f"{mes} no valor de R$ {valor:.2f}" for mes, valor in data['debitos'].items()]
+            ) + "."
+            mensagens_df.loc[mensagens_df["Empresa"].astype(str) == cnpj, "Mensagem"] += f" {mensagem_fgts}"
+        else:
+            mensagem = f"{nome_empresa}, segue resumo dos seus débitos de FGTS: {debitos_texto}."
+            mensagens_df = pd.concat([mensagens_df, pd.DataFrame({"Empresa": [cnpj], "Mensagem": [mensagem]})], ignore_index=True)
+
+    # Salvar o arquivo atualizado
+    mensagens_df.to_excel("mensagens.xlsx", index=False)
+
+    print("Mensagens de FGTS geradas e salvas com sucesso!")
 
 def criar_msgs_processos_sief(caminho_saida, diretorio_processos_sief):
     from datetime import datetime
@@ -1096,7 +1138,7 @@ def criar_msgs(caminho_saida):
                     situacoes = df.groupby('SITUAÇÃO')['NUMERO DO PROCESSO'].apply(list).to_dict()
                     
                     # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
-                    mensagem = f"A empresa possui os seguintes débitos referente a parcelamentos: \n"
+                    mensagem = f"\n\nA empresa possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
                     for situacao, processos in situacoes.items():
                         processos_formatados = ', '.join(processos)  # Junta os números dos processos
                         mensagem += f"{situacao}'.\n"
@@ -1700,6 +1742,15 @@ def login():
     driver.get('https://app.monitorcontabil.com.br/login')
     driver.maximize_window()
 
+
+    try:
+        botao_verde = WebDriverWait(driver,3).until(
+        EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm swal-btn-green swal2-styled']"))
+        )
+        botao_verde.click()
+    except:
+        print('N tinha botao verde')
+
     sleep(2)
 
     logar_email = WebDriverWait(driver,5).until(
@@ -1745,10 +1796,11 @@ def login():
         
     sleep(3)
 
-    baixar_relatorios = WebDriverWait(driver,15).until(
-        EC.element_to_be_clickable((By.XPATH,"//button[@title='O download será feito conforme os filtros atualmente selecionados'] [1]"))
+    baixar_relatorios = WebDriverWait(driver, 15).until(
+    EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Baixar situações']]"))
     )
     baixar_relatorios.click()
+
 
     baixar_popup = WebDriverWait(driver,5).until(
         EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-success']"))
@@ -1937,16 +1989,10 @@ def login():
                         print("Numero de linhas:",len(linhas))
                     except Exception as e:
                         print(f"Erro ao clicar no botão de avançar página: {e}")
-                        criar_msg_final()
                         driver.quit()
-                    
-            criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
-            criar_msgs(caminho_saida="mensagens.xlsx")
-            criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief = diretorio_processos_sief)
+        
                         
             pasta_debitos = os.path.join(os.getcwd(), 'debitos')
-
-
 
 
 def atualizar_informacoes(frame):
@@ -1980,6 +2026,12 @@ import schedule
 import time
 import threading
 
+def criar_msgs_geral():
+    criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
+    criar_msgs(caminho_saida="mensagens.xlsx")
+    criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief = diretorio_processos_sief)
+    criar_msg_fgts()
+    criar_msg_final()
 
 # Função para configurar o horário
 def agendar_robo():
@@ -2036,6 +2088,14 @@ extrair_button = ctk.CTkButton(
     font=("Arial", 16, "bold"),
 )
 extrair_button.pack(pady=20, padx=10)
+
+botton_msgs = ctk.CTkButton(
+    menu_frame,
+    text="Criar mensagens",
+    command=criar_msgs_geral,
+    font=("Arial", 16, "bold"),
+)
+botton_msgs.pack(pady=20, padx=10)
 
 digitaliza = ctk.CTkButton(
     menu_frame,

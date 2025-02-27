@@ -87,7 +87,7 @@ def criar_msgs(caminho_saida):
                     situacoes = df.groupby('SITUAÇÃO')['NUMERO DO PROCESSO'].apply(list).to_dict()
                     
                     # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
-                    mensagem = f"A empresa possui os seguintes débitos referente a parcelamentos: \n"
+                    mensagem = f"A empresa possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
                     for situacao, processos in situacoes.items():
                         processos_formatados = ', '.join(processos)  # Junta os números dos processos
                         mensagem += f"{situacao}'.\n"
@@ -136,9 +136,15 @@ def criar_msgs_processos_sief(caminho_saida, diretorio_processos_sief):
             if 'Processos SIEF' in df.columns:
                 # Lista de processos (removendo valores vazios)
                 processos = df["Processos SIEF"].dropna().astype(str).tolist()
+
+                match = re.match(r'^\d+_(.*)\.xlsx$', arquivo)
+                if match:
+                    nome_empresa_sem_cnpj = match.group(1)
+                else:
+                    nome_empresa_sem_cnpj = "Nome não encontrado"
                 
                 # Gera a mensagem personalizada usando somente o CNPJ como identificador
-                mensagem = f"A empresa possui os seguintes débitos referentes a Processos SIEF:\n"
+                mensagem = f"\n\nA empresa {nome_empresa_sem_cnpj} possui os seguintes débitos referentes a Processos SIEF:\n\n"
                 mensagem += ', '.join(processos)
                 
                 # Salva ou concatena a mensagem no DataFrame existente, usando o CNPJ como chave
@@ -209,7 +215,8 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
                         for _, row in grupo.iterrows():
                             codigo_fiscal_completo = str(row['Código Fiscal']).strip()
-                            saldo_devedor = str(row['Saldo Devedor Consignado']).replace(',', '.')
+                            saldo_devedor = str(row['Saldo Devedor Consignado']).replace('.', '').replace(',', '.')
+                            saldo_devedor = float(saldo_devedor)
 
                             try:
                                 saldo_devedor = float(saldo_devedor)
@@ -237,6 +244,8 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                             else:
                                 descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo)
                                 tipo_debito = f"outros ({descricao})"
+
+                            print(f"PA: {pa_exercicio}, Código: {codigo_fiscal_completo}, Tipo: {tipo_debito}, Valor: {saldo_devedor}")
 
                             # Soma os valores por tipo de débito
                             if tipo_debito in debitos_por_tipo:
@@ -332,6 +341,4 @@ def criar_msg_final():
 
 
 criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
-criar_msgs(caminho_saida="mensagens.xlsx")
-criar_msg_fgts()
-criar_msg_final()
+
