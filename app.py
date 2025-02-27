@@ -1201,8 +1201,6 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                     mensagem = textwrap.dedent(mensagem)
 
 
-
-
                     for pa_exercicio, grupo in meses_agrupados:
                         mensagem += f"**Referente a {pa_exercicio}:**\n"
                         debitos_por_tipo = {}
@@ -1219,7 +1217,8 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
                             if saldo_devedor <= 0:
                                 continue  # Ignora débitos zerados
-
+                            
+            
                             match = re.match(r'(\d+)[-/](\d+)', codigo_fiscal_completo)
                             if match:
                                 codigo_fiscal_formatado_original = f"{match.group(1)}-{match.group(2)}"
@@ -1229,15 +1228,21 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                                 codigo_fiscal_com_variacao = codigo_fiscal_completo
 
                             # Verifica em qual tabela o código está presente
-                            if (codigo_fiscal_formatado_original in tabela_depto_pessoal['Código de receita'].astype(str).values or
+                            
+                            descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo).strip()
+
+                            # Se a descrição tiver PIS ou COFINS, define como Fiscal
+                            if "PIS" in descricao.upper() or "COFINS" in descricao.upper():
+                                tipo_debito = "Departamento Fiscal"
+                            elif (codigo_fiscal_formatado_original in tabela_depto_pessoal['Código de receita'].astype(str).values or
                                 codigo_fiscal_com_variacao in tabela_depto_pessoal['Código de receita'].astype(str).values):
                                 tipo_debito = "Departamento Pessoal"
                             elif (codigo_fiscal_formatado_original in tabela_fiscal['Código de receita'].astype(str).values or
-                                  codigo_fiscal_com_variacao in tabela_fiscal['Código de receita'].astype(str).values):
+                                codigo_fiscal_com_variacao in tabela_fiscal['Código de receita'].astype(str).values):
                                 tipo_debito = "Fiscal"
                             else:
-                                descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo)
                                 tipo_debito = f"outros ({descricao})"
+
 
                             print(f"PA: {pa_exercicio}, Código: {codigo_fiscal_completo}, Tipo: {tipo_debito}, Valor: {saldo_devedor}")
 
@@ -1262,7 +1267,6 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
     df_existente.to_excel(caminho_saida, index=False)
     print("Mensagens salvas com sucesso!")
-
 
 
 # Chamada da função
@@ -1335,24 +1339,24 @@ def criar_msg_final():
     print("Mensagem final adicionada com sucesso!")
 
 
-
-
+import re
 
 def extrair_nome_empresa_e_cnpj(nome_arquivo):
     """
-    Extrai o nome da empresa e o CNPJ do nome do arquivo PDF.
-    O nome do arquivo segue o formato 'situacao_fiscal--CNPJ-Nome_Arquivo.pdf'.
+    Extrai o nome da empresa e o CNPJ/CPF do nome do arquivo PDF.
+    O nome do arquivo segue o formato 'situacao_fiscal--IDENTIFICADOR-Nome_Arquivo.pdf',
+    onde IDENTIFICADOR pode ser um CNPJ (14 dígitos) ou um CPF (11 dígitos).
     """
-    # Expressão regular para capturar o CNPJ
-    cnpj = re.search(r"situacao_fiscal--(\d{14})-", nome_arquivo)
-    if cnpj:
-        cnpj = cnpj.group(1)  # Extrai o CNPJ
+    # Expressão regular para capturar CNPJ (14 dígitos) ou CPF (11 dígitos)
+    identificador = re.search(r"situacao_fiscal--(\d{11}|\d{14})-", nome_arquivo)
+    if identificador:
+        identificador = identificador.group(1)  # Extrai CPF ou CNPJ
 
-    # Remove o prefixo 'situacao_fiscal--CNPJ-' e qualquer código no final
-    nome_limpo = re.sub(r"situacao_fiscal--\d{14}-", "", nome_arquivo)
+    # Remove o prefixo 'situacao_fiscal--IDENTIFICADOR-' e qualquer código no final
+    nome_limpo = re.sub(r"situacao_fiscal--\d{11,14}-", "", nome_arquivo)
     nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
     
-    return nome_limpo.strip(), cnpj
+    return nome_limpo.strip(), identificador
 
 def renomear_pdfs_com_cnpj(pasta):
     """
@@ -1712,6 +1716,7 @@ def carregar_codigos_fiscais(caminho_arquivo_excel):
 
 import shutil
 
+
 def limpar_pastas():
     pastas = ['debitos', 'resultados', 'resultados_codigos', 'codigos fiscais', 'dividas ativas', 'processos sief']
     
@@ -1900,10 +1905,14 @@ def login():
                     numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
                     lista_numeros = [numero.text for numero in numeros]
 
+                    pa_exercicio_alternativo = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='3']//div[@class='ml-50']")
+
                     print("Códigos fiscais:", lista_numeros, "\n")
 
                     pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
                     lista_pa_exercicio = [pa.text for pa in pa_exercicio]
+
+
                     print("Pa - exercício = ", lista_pa_exercicio, "\n")
 
                     nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
