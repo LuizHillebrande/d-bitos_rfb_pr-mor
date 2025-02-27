@@ -1209,7 +1209,8 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
                         for _, row in grupo.iterrows():
                             codigo_fiscal_completo = str(row['Código Fiscal']).strip()
-                            saldo_devedor = str(row['Saldo Devedor Consignado']).replace(',', '.')
+                            saldo_devedor = str(row['Saldo Devedor Consignado']).replace('.', '').replace(',', '.')
+                            saldo_devedor = float(saldo_devedor)
 
                             try:
                                 saldo_devedor = float(saldo_devedor)
@@ -1238,6 +1239,8 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                                 descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo)
                                 tipo_debito = f"outros ({descricao})"
 
+                            print(f"PA: {pa_exercicio}, Código: {codigo_fiscal_completo}, Tipo: {tipo_debito}, Valor: {saldo_devedor}")
+
                             # Soma os valores por tipo de débito
                             if tipo_debito in debitos_por_tipo:
                                 debitos_por_tipo[tipo_debito] += saldo_devedor
@@ -1259,6 +1262,7 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
     df_existente.to_excel(caminho_saida, index=False)
     print("Mensagens salvas com sucesso!")
+
 
 
 # Chamada da função

@@ -207,8 +207,6 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                     mensagem = textwrap.dedent(mensagem)
 
 
-
-
                     for pa_exercicio, grupo in meses_agrupados:
                         mensagem += f"**Referente a {pa_exercicio}:**\n"
                         debitos_por_tipo = {}
@@ -225,7 +223,8 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
                             if saldo_devedor <= 0:
                                 continue  # Ignora débitos zerados
-
+                            
+            
                             match = re.match(r'(\d+)[-/](\d+)', codigo_fiscal_completo)
                             if match:
                                 codigo_fiscal_formatado_original = f"{match.group(1)}-{match.group(2)}"
@@ -235,15 +234,21 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                                 codigo_fiscal_com_variacao = codigo_fiscal_completo
 
                             # Verifica em qual tabela o código está presente
-                            if (codigo_fiscal_formatado_original in tabela_depto_pessoal['Código de receita'].astype(str).values or
+                            
+                            descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo).strip()
+
+                            # Se a descrição tiver PIS ou COFINS, define como Fiscal
+                            if "PIS" in descricao.upper() or "COFINS" in descricao.upper():
+                                tipo_debito = "Departamento Fiscal"
+                            elif (codigo_fiscal_formatado_original in tabela_depto_pessoal['Código de receita'].astype(str).values or
                                 codigo_fiscal_com_variacao in tabela_depto_pessoal['Código de receita'].astype(str).values):
                                 tipo_debito = "Departamento Pessoal"
                             elif (codigo_fiscal_formatado_original in tabela_fiscal['Código de receita'].astype(str).values or
-                                  codigo_fiscal_com_variacao in tabela_fiscal['Código de receita'].astype(str).values):
+                                codigo_fiscal_com_variacao in tabela_fiscal['Código de receita'].astype(str).values):
                                 tipo_debito = "Fiscal"
                             else:
-                                descricao = re.sub(r'^\d+[-/]\d+\s-\s', '', codigo_fiscal_completo)
                                 tipo_debito = f"outros ({descricao})"
+
 
                             print(f"PA: {pa_exercicio}, Código: {codigo_fiscal_completo}, Tipo: {tipo_debito}, Valor: {saldo_devedor}")
 
