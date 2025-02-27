@@ -163,6 +163,7 @@ criar_msgs_processos_sief(caminho_saida='mensagens.xlsx',diretorio_processos_sie
 
 
 def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida):
+    
     data_atual = datetime.now().strftime("%d/%m/%y")
     if os.path.exists(caminho_saida):
         df_existente = pd.read_excel(caminho_saida)
@@ -188,9 +189,17 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
                     # Função para ajustar o formato do PA - Exercício
                     def formatar_pa_exercicio(pa_exercicio):
                         try:
-                            if len(str(pa_exercicio).split('/')) == 3:  # Caso DDD/MM/YYYY
-                                return '/'.join(str(pa_exercicio).split('/')[1:])
-                            return str(pa_exercicio)
+                            pa_exercicio_str = str(pa_exercicio).strip()
+                            # Se estiver no formato DDD/MM/YYYY, remove o dia e retorna MM/AAAA
+                            if len(pa_exercicio_str.split('/')) == 3:
+                                return '/'.join(pa_exercicio_str.split('/')[1:])
+                            # Se for apenas um número seguido de "º", adiciona " TRIMESTRE"
+                            if re.match(r"^\dº$", pa_exercicio_str):
+                                return f"{pa_exercicio_str} TRIMESTRE"
+                            # Se estiver no formato MM/AAAA, retorna como está
+                            if re.match(r"^\d{2}/\d{4}$", pa_exercicio_str):
+                                return pa_exercicio_str
+                            return pa_exercicio_str
                         except Exception as e:
                             print(f"Erro ao formatar PA - Exercício: {pa_exercicio}, erro: {e}")
                             return None
