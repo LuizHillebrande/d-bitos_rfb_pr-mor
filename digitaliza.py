@@ -304,7 +304,7 @@ def iniciar_webdriver(email, senha):
                 # Copiar e colar usando pyperclip + pyautogui
                 click_edit_mensagem.send_keys(mensagem_personalizada)
                 print("Colei")
-                sleep(2)
+                sleep(20)
 
                 botoes = driver.find_elements(By.XPATH, "//button[text()='Salvar']")
                 for botao in botoes:

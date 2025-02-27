@@ -520,7 +520,7 @@ def iniciar_webdriver(email, senha):
     total_empresas = contar_pdfs()  # Agora conta os arquivos PDF na pasta 'debitos'
     total_enviadas = 0
     #relatório de pendências fiscais
-    #extrair_nomes_empresas()
+    extrair_nomes_empresas()
     excel_msg = openpyxl.load_workbook(r"nomes_empresas\empresas.xlsx")
     sheet_excel_msg = excel_msg.active
     try:
@@ -557,7 +557,7 @@ def iniciar_webdriver(email, senha):
             
     
             data_vcto_input_padrao = datetime.now().strftime("27/%m/%Y")
-            print('Lopacarai',data_vcto_input_padrao)
+            print('data de vcto padrao',data_vcto_input_padrao)
             data_atual = datetime.now().strftime("%d/%m/%y")
             competencia_padrao = datetime.now().strftime("%m/%y")
             nome_empresa = linha[0].value
@@ -762,7 +762,7 @@ def iniciar_webdriver(email, senha):
                 # Copiar e colar usando pyperclip + pyautogui
                 click_edit_mensagem.send_keys(mensagem_personalizada)
                 print("Colei")
-                sleep(2)
+                sleep(30)
 
                 botoes = driver.find_elements(By.XPATH, "//button[text()='Salvar']")
                 for botao in botoes:
@@ -1530,6 +1530,9 @@ def consultar_pdf_da_empresa_codigos(nome_empresa, numeros_procurados):
     else:
         print(f"⚠️ CNPJ não encontrado no nome da empresa '{nome_empresa}'.")
 
+import pdfplumber
+import re
+
 def abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa):
     """
     Abre o PDF, busca os códigos fiscais e PA - EXERC. e extrai o saldo devedor consignado.
@@ -1571,7 +1574,6 @@ def abrir_pdf_codigos(caminho_pdf, numeros_procurados, nome_empresa):
 
     except Exception as e:
         print(f"Erro ao abrir ou processar o PDF {caminho_pdf}: {e}")
-
 
 
 def salvar_resultados_excel(resultados, nome_empresa):
@@ -1905,15 +1907,21 @@ def login():
                     numeros = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
                     lista_numeros = [numero.text for numero in numeros]
 
-                    pa_exercicio_alternativo = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='3']//div[@class='ml-50']")
-
                     print("Códigos fiscais:", lista_numeros, "\n")
 
                     pa_exercicio = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='2']//div[@class='ml-50']")
-                    lista_pa_exercicio = [pa.text for pa in pa_exercicio]
+                    lista_pa_exercicio = []
+                    for pa in pa_exercicio:
+                        texto = pa.text.strip()
+                        # Se contém "TRIM", pegar somente o primeiro elemento (ex.: "3º" ou "4º")
+                        if "TRIM" in texto:
+                            texto = texto.split()[0]
+                        lista_pa_exercicio.append(texto)
+                    print('Lista pa exerc = ', lista_pa_exercicio, '\n')
 
+                    pa_exercicio_alternativo = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='3']//div[@class='ml-50']")
+                    lista_pa_exercicio_alternativo = [pa.text for pa in pa_exercicio_alternativo]
 
-                    print("Pa - exercício = ", lista_pa_exercicio, "\n")
 
                     nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
                     pasta_debitos = os.path.join(os.getcwd(), 'debitos')
@@ -2158,7 +2166,7 @@ try:
 
     partnership_label = ctk.CTkLabel(
         main_frame,
-        text="Uma parceria entre Primor e Luiz Fernando Hillebrande",
+        text="Primor 🤝 Luiz Fernando Hillebrande",
         font=("Arial", 16, "italic"),
         anchor="center",
     )
