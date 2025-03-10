@@ -1170,15 +1170,19 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
             df = pd.read_excel(caminho_arquivo)
 
             if {'Empresa', 'Código Fiscal', 'PA - Exercício', 'Saldo Devedor Consignado'}.issubset(df.columns):
+
+                empresa_str = str(df['Empresa'].iloc[0]).strip()
                 # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "Empresa"
                 cnpj = re.search(r'(\d{14})', str(df['Empresa'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
+                if not cnpj:
+                    cnpj = re.search(r'(\d{11})', empresa_str) 
                 if cnpj:
                     cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
                     
                     # Remover o CNPJ do nome da empresa para utilizá-lo na mensagem
                     nome_empresa_sem_cnpj = df['Empresa'].iloc[0].replace(cnpj + "_", "")  # Remove o CNPJ do início do nome
                     
-                    print(f"🔍 Buscando pelo CNPJ: {cnpj}")
+                    print(f"🔍 Buscando pelo CNPJ/CPF: {cnpj}")
                     
                     # Função para ajustar o formato do PA - Exercício
                     def formatar_pa_exercicio(pa_exercicio):
@@ -1211,7 +1215,7 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
 
                     for pa_exercicio, grupo in meses_agrupados:
-                        mensagem += f"**Referente a {pa_exercicio}:**\n"
+                        mensagem += f"*Referente a {pa_exercicio}:*\n"
                         debitos_por_tipo = {}
 
                         for _, row in grupo.iterrows():
@@ -1276,7 +1280,6 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
     df_existente.to_excel(caminho_saida, index=False)
     print("Mensagens salvas com sucesso!")
-
 
 # Chamada da função
 import pandas as pd
@@ -1629,6 +1632,24 @@ def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     caminho_arquivo = os.path.join(pasta_destino, f"{nome_arquivo}.xlsx")
     df.to_excel(caminho_arquivo, index=False)
     print(f"Arquivo salvo em {caminho_arquivo}")
+
+def salvar_gfip_em_excel(lista_competencia, nome_arquivo, pasta_destino, lista_valores):
+    
+    # Verificar se o diretório existe, se não, criar o diretório
+    if not os.path.exists(pasta_destino):
+        os.makedirs(pasta_destino)
+    
+    # Salvar a lista de números e PA em um DataFrame
+    df = pd.DataFrame({
+        "Valores": lista_valores,  # Lista de números
+        "PA - EXERC.": lista_competencia  # Lista de PA - Exercicio
+    })
+    
+    # Salvar o DataFrame no arquivo Excel
+    caminho_arquivo = os.path.join(pasta_destino, f"{nome_arquivo}.xlsx")
+    df.to_excel(pasta_destino, index=False)
+    
+    print(f"Arquivo salvo em {pasta_destino}")
 
 import pandas as pd
 import os
@@ -1999,6 +2020,35 @@ def login():
 
                 except Exception as e:
                     print(f"Erro ao clicar em 'Dividas Ativas' ou extrair os números: {e}")
+
+                #tentando clicar em gfip_gps
+                try: 
+                    gfip_gps = WebDriverWait(driver,1).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'list-group-item') and contains(@class, 'collapsed')]//span[text()='Divergência GFIP x GPS']"))
+                    )
+                    gfip_gps.click()
+
+                    # Extrair todos os números de todos os <div class="ml-50"> dentro da coluna específica
+                    competencias = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='1']//div[@class='ml-50']")
+                    lista_competencia = [competencia.text for competencia in competencias]
+
+                    valores = driver.find_elements(By.XPATH, "//tr//td[@aria-colindex='4']//div[@class='ml-50']")
+                    lista_valores = [valor.text for valor in valores]
+        
+                    # Gerar nome do arquivo com CNPJ e nome da empresa
+                    nome_arquivo = f"{cnpj}_{nome_empresa}".replace("/", "_").replace(".", "_")  # Substituindo caracteres não permitidos
+
+                    pasta_destino = "resultado_gfip_gps"
+                    if not os.path.exists(pasta_destino):
+                        os.makedirs(pasta_destino)
+                    
+                    salvar_gfip_em_excel(lista_competencia, nome_arquivo, pasta_destino, lista_valores)
+                    sleep(1)
+
+                    
+
+                except Exception as e:
+                    print(f"Erro ao clicar em 'GFIP GPS' ou extrair os números: {e}")
                 
                 
 
