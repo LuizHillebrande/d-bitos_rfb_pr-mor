@@ -1125,12 +1125,13 @@ def criar_msgs(caminho_saida):
             if {'EMPRESA', 'DÍVIDA ATIVA', 'NUMERO DO PROCESSO', 'SITUAÇÃO'}.issubset(df.columns):
                 
                 # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "EMPRESA"
-                cnpj = re.search(r'(\d{14})', str(df['EMPRESA'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
+                cnpj = re.search(r'(\d{11}|\d{14})', str(df['EMPRESA'].iloc[0]))  # Aceita CPF ou CNPJ
                 if cnpj:
                     cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
                     
                     # Remover o CNPJ do nome da empresa para utilizá-lo na mensagem
-                    nome_empresa_sem_cnpj = df['EMPRESA'].iloc[0].replace(cnpj + "_", "")  # Remove o CNPJ do início do nome
+                    nome_empresa_sem_cnpj = re.sub(rf"{cnpj}\s*[-_]*\s*", "", df['EMPRESA'].iloc[0])
+
                     
                     print(f"🔍 Buscando pelo CNPJ: {cnpj}")
                     
@@ -1138,7 +1139,7 @@ def criar_msgs(caminho_saida):
                     situacoes = df.groupby('SITUAÇÃO')['NUMERO DO PROCESSO'].apply(list).to_dict()
                     
                     # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
-                    mensagem = f"\n\nA empresa possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
+                    mensagem = f"A empresa possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
                     for situacao, processos in situacoes.items():
                         processos_formatados = ', '.join(processos)  # Junta os números dos processos
                         mensagem += f"{situacao}'.\n"
@@ -1153,7 +1154,6 @@ def criar_msgs(caminho_saida):
             
         df_existente.to_excel(caminho_saida, index=False)
         print("Mensagens salvas com sucesso!")
-
 
 
 def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida):
@@ -1356,19 +1356,21 @@ import re
 def extrair_nome_empresa_e_cnpj(nome_arquivo):
     """
     Extrai o nome da empresa e o CNPJ/CPF do nome do arquivo PDF.
-    O nome do arquivo segue o formato 'situacao_fiscal--IDENTIFICADOR-Nome_Arquivo.pdf',
-    onde IDENTIFICADOR pode ser um CNPJ (14 dígitos) ou um CPF (11 dígitos).
-    """
-    # Expressão regular para capturar CNPJ (14 dígitos) ou CPF (11 dígitos)
-    identificador = re.search(r"situacao_fiscal--(\d{11}|\d{14})-", nome_arquivo)
-    if identificador:
-        identificador = identificador.group(1)  # Extrai CPF ou CNPJ
-
-    # Remove o prefixo 'situacao_fiscal--IDENTIFICADOR-' e qualquer código no final
-    nome_limpo = re.sub(r"situacao_fiscal--\d{11,14}-", "", nome_arquivo)
-    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
+    O nome do arquivo pode seguir os formatos:
+    - 'situacao_fiscal--IDENTIFICADOR-Nome_Arquivo.pdf'
+    - 'situacao_fiscal_02-2025--IDENTIFICADOR-Nome_Arquivo.pdf'
     
-    return nome_limpo.strip(), identificador
+    Onde IDENTIFICADOR pode ser um CNPJ (14 dígitos) ou um CPF (11 dígitos).
+    """
+    # Expressão regular para capturar o identificador (CNPJ ou CPF)
+    identificador = re.search(r"situacao_fiscal(?:_\d{2}-\d{4})?--(\d{11}|\d{14})-", nome_arquivo)
+    identificador = identificador.group(1) if identificador else None  # Extrai CPF ou CNPJ
+
+    # Remove prefixo 'situacao_fiscal' e qualquer código final
+    nome_limpo = re.sub(r"situacao_fiscal(?:_\d{2}-\d{4})?--\d{11,14}-", "", nome_arquivo)
+    nome_limpo = re.sub(r"_[0-9]+\.pdf$", "", nome_limpo)  # Remove código final (se existir)
+
+    return nome_limpo.strip(), identificador  # Retorna o nome limpo primeiro
 
 def renomear_pdfs_com_cnpj(pasta):
     """
@@ -1634,7 +1636,7 @@ def salvar_numeros_em_excel(lista_numeros, nome_arquivo, pasta_destino):
     print(f"Arquivo salvo em {caminho_arquivo}")
 
 def salvar_gfip_em_excel(lista_competencia, nome_arquivo, pasta_destino, lista_valores):
-    
+
     # Verificar se o diretório existe, se não, criar o diretório
     if not os.path.exists(pasta_destino):
         os.makedirs(pasta_destino)
@@ -1647,7 +1649,7 @@ def salvar_gfip_em_excel(lista_competencia, nome_arquivo, pasta_destino, lista_v
     
     # Salvar o DataFrame no arquivo Excel
     caminho_arquivo = os.path.join(pasta_destino, f"{nome_arquivo}.xlsx")
-    df.to_excel(pasta_destino, index=False)
+    df.to_excel(caminho_arquivo, index=False)
     
     print(f"Arquivo salvo em {pasta_destino}")
 
@@ -1898,12 +1900,17 @@ def login():
 
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "tr.clickable")))
 
+    indice_global = 0
+    pagina = 1
+
     # Encontrar todas as linhas da tabela
     while True:
         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
 
-        for i, linha in enumerate(linhas):  # Define o início da iteração
-            linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
+        inicio = 0
+        print(f"Página {pagina} - Processando elementos a partir do índice {inicio} de {len(linhas)}")
+
+        for i, linha in enumerate(linhas[inicio:], start=inicio):
             print("Numero de linhas:",len(linhas))
             print(f'Processando linha {i + 1} de {len(linhas)}')
             try:
@@ -2065,6 +2072,8 @@ def login():
                         )
                         pula_pagina.click()
                         print("Avançando para a próxima página...")
+                        sleep(5)
+                        pagina += 1
                         linhas = driver.find_elements(By.CSS_SELECTOR, "tr.clickable")
                         print("Numero de linhas:",len(linhas))
                     except Exception as e:
