@@ -1141,7 +1141,7 @@ def criar_msgs(caminho_saida):
                     # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
                     mensagem = f"A empresa possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
                     for situacao, processos in situacoes.items():
-                        processos_formatados = ', '.join(processos)  # Junta os números dos processos
+                        processos_formatados = ', '.join(map(str, processos))  # Junta os números dos processos
                         mensagem += f"{situacao}'.\n"
 
                     df_existente = salvar_mensagem(df_existente, cnpj, mensagem.strip(), caminho_saida)
@@ -1155,6 +1155,78 @@ def criar_msgs(caminho_saida):
         df_existente.to_excel(caminho_saida, index=False)
         print("Mensagens salvas com sucesso!")
 
+diretorio_gps = os.path.join(os.getcwd(), 'resultado_gfip_gps')
+
+def criar_msgs_gps(diretorio_gps, caminho_saida):
+    data_atual = datetime.now().strftime("%d/%m/%y")
+
+    if os.path.exists(caminho_saida):
+        df_existente = pd.read_excel(caminho_saida)
+    else:
+        df_existente = pd.DataFrame(columns=["Empresa", "Mensagem"])
+
+    for arquivo in os.listdir(diretorio_gps):
+        if arquivo.endswith('.xlsx') or arquivo.endswith('.xls'):
+            caminho_arquivo = os.path.join(diretorio_gps, arquivo)
+
+            # Extraindo CNPJ ou CPF do nome do arquivo
+            match = re.match(r'(\d{11}|\d{14})_(.+)\.xls[x]?', arquivo)
+            if not match:
+                print(f"⚠️ Nome de arquivo inválido: {arquivo}")
+                continue
+
+            cnpj_cpf, nome_empresa = match.groups()
+
+            print(f"🔍 Processando {nome_empresa} - {cnpj_cpf}")
+
+            df = pd.read_excel(caminho_arquivo)
+
+            if {'Valores', 'PA - EXERC.'}.issubset(df.columns):
+                # Remover linhas vazias
+                df = df.dropna(subset=['Valores', 'PA - EXERC.'])
+
+                # Ajustar formato do PA - Exercício (para garantir consistência)
+                def formatar_pa_exercicio(pa_exercicio):
+                    try:
+                        pa_exercicio_str = str(pa_exercicio).strip()
+                        if len(pa_exercicio_str.split('/')) == 3:
+                            return '/'.join(pa_exercicio_str.split('/')[1:])
+                        if re.match(r"^\d{2}/\d{4}$", pa_exercicio_str):
+                            return pa_exercicio_str
+                        return pa_exercicio_str
+                    except Exception:
+                        return None
+
+                df['PA - EXERC.'] = df['PA - EXERC.'].apply(formatar_pa_exercicio)
+
+                # Agrupar valores por PA - Exercício
+                debitos_por_pa = df.groupby('PA - EXERC.')['Valores'].sum().to_dict()
+
+                # Construir a mensagem
+                mensagem = f"\n\n{nome_empresa}, identificamos que sua empresa possui débitos de INSS na Receita Federal.\n"
+                mensagem += "Segue o resumo dos valores pendentes:\n\n"
+
+                for pa_exercicio, valor in debitos_por_pa.items():
+                    print('Valorrrrrrrrrr: ', valor,'\n')
+                    if isinstance(valor, str):
+                        valor = valor.replace('.', '').replace(',', '.').strip()
+                    
+                    try:
+                        valor = float(valor)
+                    except ValueError:
+                        valor = 0.0
+                    mensagem += f"  - Referente a {pa_exercicio}: R$ {valor:.2f}\n"
+
+                mensagem += "\nEsses débitos fazem parte do **Departamento Pessoal**.\n"
+
+                df_existente = salvar_mensagem(df_existente, cnpj_cpf, mensagem.strip(), caminho_saida)
+
+                print(f"Mensagem gerada para {nome_empresa}:\n{mensagem}\n")
+            else:
+                print(f"⚠️ O arquivo {arquivo} não possui as colunas esperadas.")
+
+    df_existente.to_excel(caminho_saida, index=False)
+    print("Mensagens salvas com sucesso!")
 
 def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida):
     
@@ -2119,8 +2191,12 @@ def criar_msgs_geral():
     criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, caminho_saida = 'mensagens.xlsx')
     criar_msgs(caminho_saida="mensagens.xlsx")
     criar_msgs_processos_sief(caminho_saida="mensagens.xlsx", diretorio_processos_sief = diretorio_processos_sief)
-    criar_msg_fgts()
+    criar_msgs_gps(diretorio_gps,caminho_saida='mensagens.xlsx')
+    #criar_msg_fgts()
     criar_msg_final()
+    messagebox.showinfo("Sucesso!", "Mensagens geradas!")
+
+criar_msgs_geral()
 
 # Função para configurar o horário
 def agendar_robo():
