@@ -1125,13 +1125,12 @@ def criar_msgs(caminho_saida):
             if {'EMPRESA', 'DÍVIDA ATIVA', 'NUMERO DO PROCESSO', 'SITUAÇÃO'}.issubset(df.columns):
                 
                 # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "EMPRESA"
-                cnpj = re.search(r'(\d{11}|\d{14})', str(df['EMPRESA'].iloc[0]))  # Aceita CPF ou CNPJ
+                cnpj = re.search(r'(\d{11}|\d{14})', str(df['EMPRESA'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
                 if cnpj:
                     cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
                     
                     # Remover o CNPJ do nome da empresa para utilizá-lo na mensagem
-                    nome_empresa_sem_cnpj = re.sub(rf"{cnpj}\s*[-_]*\s*", "", df['EMPRESA'].iloc[0])
-
+                    nome_empresa_sem_cnpj = df['EMPRESA'].iloc[0].replace(cnpj + "_", "")  # Remove o CNPJ do início do nome
                     
                     print(f"🔍 Buscando pelo CNPJ: {cnpj}")
                     
@@ -1139,7 +1138,7 @@ def criar_msgs(caminho_saida):
                     situacoes = df.groupby('SITUAÇÃO')['NUMERO DO PROCESSO'].apply(list).to_dict()
                     
                     # Gera a mensagem personalizada para a empresa (usando o nome sem o CNPJ)
-                    mensagem = f"A empresa possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
+                    mensagem = f"A empresa {nome_empresa_sem_cnpj} possui os seguintes débitos na Procuradoria-Geral da Fazenda Nacional: \n"
                     for situacao, processos in situacoes.items():
                         processos_formatados = ', '.join(map(str, processos))  # Junta os números dos processos
                         mensagem += f"{situacao}'.\n"

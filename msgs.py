@@ -140,7 +140,8 @@ def criar_msgs(caminho_saida):
             if {'EMPRESA', 'DÍVIDA ATIVA', 'NUMERO DO PROCESSO', 'SITUAÇÃO'}.issubset(df.columns):
                 
                 # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "EMPRESA"
-                cnpj = re.search(r'(\d{14})', str(df['EMPRESA'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
+                cnpj = re.search(r'(\d{11}|\d{14})', str(df['EMPRESA'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
+                
                 if cnpj:
                     cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
                     
@@ -242,15 +243,19 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
             df = pd.read_excel(caminho_arquivo)
 
             if {'Empresa', 'Código Fiscal', 'PA - Exercício', 'Saldo Devedor Consignado'}.issubset(df.columns):
+
+                empresa_str = str(df['Empresa'].iloc[0]).strip()
                 # Tenta extrair o CNPJ limpo (14 dígitos) da coluna "Empresa"
                 cnpj = re.search(r'(\d{14})', str(df['Empresa'].iloc[0]))  # Supondo que o CNPJ esteja na primeira linha
+                if not cnpj:
+                    cnpj = re.search(r'(\d{11})', empresa_str) 
                 if cnpj:
                     cnpj = cnpj.group(1)  # Extrai o CNPJ limpo
                     
                     # Remover o CNPJ do nome da empresa para utilizá-lo na mensagem
                     nome_empresa_sem_cnpj = df['Empresa'].iloc[0].replace(cnpj + "_", "")  # Remove o CNPJ do início do nome
                     
-                    print(f"🔍 Buscando pelo CNPJ: {cnpj}")
+                    print(f"🔍 Buscando pelo CNPJ/CPF: {cnpj}")
                     
                     # Função para ajustar o formato do PA - Exercício
                     def formatar_pa_exercicio(pa_exercicio):
@@ -283,7 +288,7 @@ def criar_msgs_codigos(diretorio_codigos, tabela_depto_pessoal, tabela_fiscal, c
 
 
                     for pa_exercicio, grupo in meses_agrupados:
-                        mensagem += f"**Referente a {pa_exercicio}:**\n"
+                        mensagem += f"*Referente a {pa_exercicio}:*\n"
                         debitos_por_tipo = {}
 
                         for _, row in grupo.iterrows():
