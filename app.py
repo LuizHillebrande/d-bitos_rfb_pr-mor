@@ -170,7 +170,56 @@ def extrair_cnpj_nome_empresa(driver):
         print(f"Erro ao extrair CNPJ e nome da empresa: {e}")
         return None
 
+import tkinter as tk
 
+def verificar_captcha(janela_captcha, label_tempo, tempo_restante, driver):
+    def atualizar_tempo():
+        nonlocal tempo_restante
+        if tempo_restante > 0:
+            tempo_restante -= 1
+            label_tempo.config(text=f"Tempo restante: {tempo_restante}s")
+            label_tempo.after(1000, atualizar_tempo)  # Chama a função novamente após 1 segundo
+        else:
+            if janela_captcha.winfo_exists():  # Verifica se a janela ainda está aberta
+                janela_captcha.destroy()
+
+        # Verifica se o CAPTCHA já foi resolvido
+        try:
+            driver.switch_to.default_content()  # Sai do iframe, se estiver dentro
+            hcaptcha_iframes = driver.find_elements(By.XPATH, "//iframe[contains(@title, 'hCaptcha')]")
+            if not hcaptcha_iframes:  # Se não encontrar o iframe, significa que o CAPTCHA sumiu
+                print("CAPTCHA resolvido automaticamente!")
+                if janela_captcha.winfo_exists():
+                    janela_captcha.destroy()
+                return
+        except Exception:
+            pass  # Se houver erro, continua a contagem regressiva normalmente
+
+    # Inicia a atualização de tempo dentro da thread principal do Tkinter
+    label_tempo.after(1000, atualizar_tempo)
+
+
+
+def mostrar_aviso_captcha(driver, tempo=60):
+    janela_captcha = ctk.CTkToplevel()
+    janela_captcha.title("Ação necessária: Resolver CAPTCHA")
+    janela_captcha.geometry("350x180")
+    janela_captcha.grab_set()  # Bloqueia interação com a janela principal
+    
+    label_msg = tk.Label(janela_captcha, text="Resolvendo CAPTCHA... Aguarde.", font=("Arial", 12))
+    label_msg.pack(pady=10)
+
+    label_tempo = tk.Label(janela_captcha, text=f"Tempo restante: {tempo}s", font=("Arial", 12, "bold"), fg="red")
+    label_tempo.pack(pady=10)
+
+    # Botão para o usuário confirmar que resolveu o CAPTCHA manualmente
+    btn_resolvi = ctk.CTkButton(janela_captcha, text="Resolvi", command=janela_captcha.destroy)
+    btn_resolvi.pack(pady=10)
+
+    # Inicia a contagem regressiva em outra thread
+    threading.Thread(target=verificar_captcha, args=(janela_captcha, label_tempo, tempo, driver), daemon=True).start()
+
+    janela_captcha.mainloop()
 
 def pegar_debitos_fgts():
     mes_atual = datetime.now().strftime("%m-%Y")
@@ -210,10 +259,7 @@ def pegar_debitos_fgts():
         hcaptcha_iframe = driver.find_element(By.XPATH, "//iframe[contains(@src, 'hcaptcha')]")
         if hcaptcha_iframe:
             print("hCaptcha detectado via Selenium.")
-            driver.quit()
-            sleep(10)
-            pegar_debitos_fgts()
-            return
+            mostrar_aviso_captcha(driver)
     except Exception as e:
         # Se não encontrar, continua
         pass
@@ -477,7 +523,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from Levenshtein import distance
 
-# Credenciais padrão
 DEFAULT_EMAIL = "legal@contabilprimor.com.br"
 DEFAULT_SENHA = "q7ne5k0la0VJ"
 
@@ -556,7 +601,7 @@ def iniciar_webdriver(email, senha):
                     pass
             
     
-            data_vcto_input_padrao = datetime.now().strftime("27/%m/%Y")
+            data_vcto_input_padrao = datetime.now().strftime("31/%m/%Y")
             print('data de vcto padrao',data_vcto_input_padrao)
             data_atual = datetime.now().strftime("%d/%m/%y")
             competencia_padrao = datetime.now().strftime("%m/%y")
@@ -727,6 +772,31 @@ def iniciar_webdriver(email, senha):
             # Esperar o upload ser processado (caso tenha carregamento)
             sleep(5) 
 
+            try:
+                baixar_elemento = WebDriverWait(driver,5).until(
+                    EC.element_to_be_clickable((By.XPATH,"//input[@placeholder='Selecione um template']"))
+                )
+                baixar_elemento.click()
+                
+                sleep(2)
+
+                pyautogui.write('Situa')
+
+                sleep(1)
+
+                pyautogui.press('enter')
+
+                try:
+                    aceitar_pop_up = WebDriverWait(driver,3).until(
+                        EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm px-3 py-2 swal2-styled swal2-default-outline']"))
+                    )
+                    aceitar_pop_up.click()
+
+                except Exception as e:
+                    print('n tinha pop up, erro:', e)
+            except Exception as e:
+                print(f"Erro {e}")
+
             enviar_msg = WebDriverWait(driver,5).until(
                 EC.element_to_be_clickable((By.XPATH,"//button[@class='btn btn-sm btn-transparent px-1 py-0'] [1]"))
             )
@@ -743,12 +813,17 @@ def iniciar_webdriver(email, senha):
 
             # Procurar o CNPJ na coluna 0 e pegar a mensagem da coluna 1
             mensagem_personalizada = None
-            for linha in sheet_mensagens.iter_rows(min_row=2, max_row=10):
-                cnpj_planilha = str(linha[0].value)
+            for linha in sheet_mensagens.iter_rows(min_row=2, max_row=500):
+
+
+                cnpj_planilha = str(linha[0].value).zfill(14)
                 print(f'Cnpj {cnpj_planilha}')
                 mensagem = str(linha[1].value)
+
+                if not cnpj or not mensagem:
+                    continue
                 #print(f'Mensagem {mensagem}')
-                if str(cnpj).strip() == str(cnpj_planilha).strip():  # Comparar sem espaços extras
+                if str(cnpj).strip().zfill(14) == cnpj_planilha:  # Adiciona zeros à esquerda se necessário
                     mensagem_personalizada = mensagem
                     break
 
@@ -762,7 +837,7 @@ def iniciar_webdriver(email, senha):
                 # Copiar e colar usando pyperclip + pyautogui
                 click_edit_mensagem.send_keys(mensagem_personalizada)
                 print("Colei")
-                sleep(30)
+                sleep(2)
 
                 botoes = driver.find_elements(By.XPATH, "//button[text()='Salvar']")
                 for botao in botoes:
@@ -797,25 +872,25 @@ def iniciar_webdriver(email, senha):
 
                 total_enviadas += 1
 
-                '''
                 concluir_e_enviar = WebDriverWait(driver, 5).until(
                     EC.element_to_be_clickable((By.XPATH, "//button[@class='btn btn-success' and contains(text(), 'Concluir e enviar')]"))
                 )
                 concluir_e_enviar.click()
-
+                '''
                 botao_ok = WebDriverWait(driver,5).until(
                     EC.element_to_be_clickable((By.XPATH,"//button[@class='swal2-confirm px-3 py-2 swal2-styled']"))
                 )
                 botao_ok.click()
                 '''
-                botoes_fechar = driver.find_elements(By.XPATH, "//button[@data-bs-dismiss='modal']")
-                for botao in botoes_fechar:
-                    
-                    if botao.is_displayed():  # Verifica se o botão está visível na tela
-                        botao.click()
-                        break  # Para após clicar no primeiro botão visível
-
-                
+                try:
+                    botoes_fechar = driver.find_elements(By.XPATH, "//button[@data-bs-dismiss='modal']")
+                    for botao in botoes_fechar:
+                        
+                        if botao.is_displayed():  # Verifica se o botão está visível na tela
+                            botao.click()
+                            break  # Para após clicar no primeiro botão visível
+                except:
+                    print("Nao tinha botoes de fechar")
 
                 sleep(5)
 
@@ -846,13 +921,14 @@ def iniciar_webdriver(email, senha):
 
         # Enviar email com os resultados
         enviar_email(empresas_nao_enviadas, total_empresas, total_enviadas)
-        messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
+        messagebox.showinfo("Sucesso", "Mensagens enviadas com sucesso!")
         sleep(50)
 
         if driver.service.is_connectable():
             driver.quit()
     except Exception as e:
         print("Erro", f"Falha no login: {e}")
+        #teste1
 
 def contar_pdfs():
     pasta = "debitos"
@@ -1787,8 +1863,26 @@ def descompactar_arquivo_zip(download_folder, driver):
                 EC.element_to_be_clickable((By.XPATH, "//a[contains(@id, '__BV_toggle_') and contains(@class, 'nav-link dropdown-toggle')]"))
             )
             baixar_nuvem.click()
-            print("Nenhum arquivo ZIP encontrado. Tentando novamente em 5 segundos...")
-            pyautogui.click(667, 300, duration=1)  # Clica no botão
+                
+            sleep(2)
+            '''
+            try:
+                WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located((By.XPATH, "//small[contains(text(), 'Em Execução')]"))
+                )
+                print("Status 'Em Execução' detectado. Aguardando finalização...")
+            except:
+                print("Aviso: 'Em Execução' não apareceu. Pode ser que já esteja pronto.")
+                botoes_download = driver.find_elements(By.XPATH, "//div[@class='col-2']//svg[@class='text-body feather feather-download']")
+
+                if botoes_download:
+                    botoes_download[-1].click()  # Clica no último botão da lista
+                    print("Download iniciado.")
+                else:
+                    print("Nenhum botão de download encontrado.")'
+            '''
+                 
+            print("Nenhum arquivo ZIP encontrado. Tentando novamente em 10 segundos...")
             time.sleep(10)  # Espera 10 segundos antes de tentar novamente
 
     # Se encontrou um ZIP, descompacta
@@ -1935,16 +2029,12 @@ def login():
         EC.invisibility_of_element_located((By.XPATH, "//small[@class='notification-text' and text()='Em Execução']"))
     )
 
-    # Agora que o "Em Execução" não está mais visível, podemos clicar no botão de download
+        # Agora que o "Em Execução" não está mais visível, podemos clicar no botão de download
     #baixar_definitivamente = WebDriverWait(driver, 10).until(
         #EC.element_to_be_clickable((By.XPATH, "//div[@class='media mr-1']//div[@class='col-2']//svg[contains(@class, 'feather-download')]"))
     #)
     #baixar_definitivamente.click()
 
-
-    pyautogui.click(667,300, duration = 1)
-
-    sleep(5)
     descompactar_arquivo_zip(download_folder, driver)
     sleep(2)
     renomear_pdfs_com_cnpj(pasta_pdfs)
@@ -2195,7 +2285,6 @@ def criar_msgs_geral():
     criar_msg_final()
     messagebox.showinfo("Sucesso!", "Mensagens geradas!")
 
-criar_msgs_geral()
 
 # Função para configurar o horário
 def agendar_robo():
@@ -2215,6 +2304,60 @@ def agendar_robo():
 
     except ValueError:
         messagebox.showerror("Erro", "Formato de hora inválido! Use o formato HH:MM.")
+
+#ENVIAR EMAILS
+
+import smtplib
+import pandas as pd
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# Configuração do remetente (coloque seu e-mail e senha de app do Gmail)
+EMAIL_REMETENTE = "luizhill.dev@gmail.com"
+SENHA_APP = "nqlf fgch thrs kpht"
+
+def enviar_emails(arquivo_excel):
+    """Lê um arquivo Excel e envia e-mails, ignorando empresas bloqueadas."""
+    
+    # Leitura do arquivo Excel
+    df = pd.read_excel(arquivo_excel)
+
+    # Iterar sobre as linhas do Excel e enviar e-mails
+    for index, row in df.iterrows():
+        mensagem = str(row.iloc[1]).strip()  # Coluna 2 (Índice 1) - Mensagem
+        email_destinatario = str(row.iloc[2]).strip()  # Coluna 3 (Índice 2) - E-mail
+        empresas_bloqueadas = str(row.iloc[3]).strip().lower()  # Coluna 4 (Índice 3) - Bloqueio
+
+        # Verifica se a empresa está bloqueada
+        if empresas_bloqueadas == 'n':
+            print(f"🚫 Empresa com e-mail {email_destinatario} bloqueada. E-mail não enviado.")
+            continue
+
+        if pd.isna(mensagem) or pd.isna(email_destinatario):
+            print(f"⚠️ Linha {index + 2} ignorada: Mensagem ou e-mail ausente.")
+            continue
+
+        # Criando o e-mail
+        msg = MIMEMultipart()
+        msg["From"] = EMAIL_REMETENTE
+        msg["To"] = email_destinatario
+        msg["Subject"] = "Aviso sobre irregularidade fiscal"
+        msg.attach(MIMEText(mensagem, "plain"))
+
+        try:
+            # Conectar ao servidor SMTP do Gmail e enviar o e-mail
+            servidor = smtplib.SMTP("smtp.gmail.com", 587)
+            servidor.starttls()  # Habilita segurança
+            servidor.login(EMAIL_REMETENTE, SENHA_APP)
+            servidor.sendmail(EMAIL_REMETENTE, email_destinatario, msg.as_string())
+            servidor.quit()
+            atualizar_logs(f"✅ E-mail enviado para {email_destinatario}")
+
+        except Exception as e:
+            atualizar_logs(f"❌ Erro ao enviar e-mail para {email_destinatario}: {e}")
+
+    atualizar_logs("📩 Processo concluído.")
+
 
 # Função para rodar o schedule em uma thread separada
 def run_schedule():
@@ -2269,6 +2412,14 @@ digitaliza = ctk.CTkButton(
 )
 digitaliza.pack(pady=20, padx=10)
 
+botton_emails = ctk.CTkButton(
+    menu_frame,
+    text="Enviar emails",
+    command=lambda: enviar_emails("mensagens.xlsx"),
+    font=("Arial", 16, "bold"),
+)
+botton_emails.pack(pady=20, padx=10)
+
 fgts_digital_button = ctk.CTkButton(
     menu_frame,
     text="FGTS Digital",
@@ -2281,6 +2432,31 @@ fgts_digital_button.pack(pady=20, padx=10)
 # Área principal
 main_frame = ctk.CTkFrame(app, corner_radius=10)
 main_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+def atualizar_logs(mensagem):
+    """Atualiza os logs dentro do main_frame sem alterar a interface principal."""
+
+    # Limpa apenas os widgets dentro do main_frame, sem recriar o frame
+    for widget in main_frame.winfo_children():
+        widget.destroy()
+
+    # Recria o frame de logs dentro do main_frame
+    log_frame = ctk.CTkFrame(master=main_frame, fg_color="transparent")
+    log_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    log_textbox = ctk.CTkTextbox(
+        master=log_frame,
+        height=200,
+        wrap="word",
+        font=("Arial", 12),
+        fg_color="#1E1E1E",
+        text_color="white"
+    )
+    log_textbox.pack(fill="both", expand=True, padx=5, pady=5)
+
+    # Adiciona a nova mensagem e rola para o final
+    log_textbox.insert("end", mensagem + "\n")
+    log_textbox.see("end")
 
 # Cabeçalho (FIXO)
 main_label = ctk.CTkLabel(
