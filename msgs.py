@@ -414,7 +414,7 @@ def criar_msg_final():
         "Atenciosamente,\n"
         "Prímor Contábil\n"
         "(44) 98462-9927 / atendimento@contabilprimor.com.br"
-    )
+    )    
 
     # Garantir que a mensagem final seja a última coisa adicionada a cada linha
     mensagens_df["Mensagem"] = mensagens_df["Mensagem"].astype(str) + mensagem_final
